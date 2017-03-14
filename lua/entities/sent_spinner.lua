@@ -30,10 +30,9 @@ function ENT:Initialize()
   self[gsSentHash].On   = false    -- Enable/disable working
   self[gsSentHash].Tick = 0        -- Entity ticking interval
   self[gsSentHash].Dir  = 0        -- Power sign for reverse support
+  self[gsSentHash].Togg = false    -- Toggle the spinner
   self[gsSentHash].PowT = Vector() -- Temporary power vector
   self[gsSentHash].LevT = Vector() -- Temporary lever vector
-  self[gsSentHash].ForW = Vector() -- For force transformation to world
-  self[gsSentHash].LevW = Vector() -- For Lever transformation to world
   self:PhysicsInit(SOLID_VPHYSICS)
   self:SetMoveType(MOVETYPE_VPHYSICS)
   self:SetSolid  (SOLID_VPHYSICS)
@@ -56,6 +55,37 @@ function ENT:Initialize()
   end; return true
 end
 
+function ENT:GetPower()
+  if(SERVER)     then local oSent = self[gsSentHash]; return oSent.Power
+  elseif(CLIENT) then return self:GetNWFloat(gsSentHash.."_power") end
+end
+
+function ENT:GetLever()
+  if(SERVER)     then local oSent = self[gsSentHash]; return oSent.Lever
+  elseif(CLIENT) then return self:GetNWFloat(gsSentHash.."_lever") end
+end
+
+function ENT:GetTorqueAxis()
+  if(SERVER)     then local oSent = self[gsSentHash]; return oSent.AxiL
+  elseif(CLIENT) then return self:GetNWFloat(gsSentHash.."_adir") end
+end
+
+function ENT:GetTorqueLever()
+  if(SERVER)     then local oSent = self[gsSentHash]; return oSent.LevL, oSent.ForL
+  elseif(CLIENT) then return self:GetNWVector(gsSentHash.."_ldir"),
+                             self:GetNWVector(gsSentHash.."_fdir") end
+end
+
+function ENT:GetOrgin()
+  if(SERVER)     then return self:GetPhysicsObject():GetMassCenter()
+  elseif(CLIENT) then return self:GetNWVector(gsSentHash.."_cen") end
+end
+
+function ENT:IsToggled()
+  if(SERVER)     then local oSpin = self[gsSentHash]; return oSpin.Togg
+  elseif(CLIENT) then return false end
+end
+
 if(SERVER) then
 
   local function getPower(vRes, vVec, nNum)
@@ -67,11 +97,12 @@ if(SERVER) then
   function ENT:SetPhysRadius(nRad)
     local nRad = (tonumber(nRad) or 0)
     if(nRad > 0) then
-      oPhys = self:GetPhysicsObject()
+      local oSent = self[gsSentHash]
+      local oPhys = self:GetPhysicsObject()
       if(oPhys and oPhys:IsValid()) then
         self:PhysicsInitSphere(nRad)
         self:SetCollisionBounds(Vector(-nRad,-nRad,-nRad),Vector(nRad,nRad,nRad))
-        oPhys:Wake()
+        oPhys:Wake(); oSent.Radius = nRad
       else ErrorNoHalt("SetRadiusPhysics: Phys invalid"); self:Remove(); return false; end
     end; return true
   end
@@ -97,6 +128,7 @@ if(SERVER) then
     if(vDir:Length() == 0) then
       ErrorNoHalt("ENT.SetTorqueAxis: Spin axis invalid"); self:Remove(); return false end
     oSent.AxiL = Vector() -- Local spin axis ( Up )
+    oSent.AxiW = Vector() -- World spin axis ( Up ) allocate memory
     oSent.AxiL:Set(vDir); oSent.AxiL:Normalize()
     self:SetNWVector(gsSentHash.."_adir",oSent.AxiL); return true
   end
@@ -106,9 +138,11 @@ if(SERVER) then
     if(vDir:Length() == 0) then
       ErrorNoHalt("ENT.SetTorqueLever: Force lever invalid"); self:Remove(); return false end
     oSent.LevL = Vector() -- Local force lever ( Right )
+    oSent.LevW = Vector() -- World force lever ( Right ) allocate memory
     oSent.ForL = Vector() -- Local force spin direction ( Forward )
+    oSent.ForW = Vector() -- World force spin direction ( Forward ) allocate memory
     oSent.LevL:Set(vDir)  -- Right
-    oSent.LevL:Mul(-1)
+    oSent.LevL:Mul(-1)    -- This is used to fix the orthogonality
     oSent.ForL:Set(oSent.LevL:Cross(oSent.AxiL)) -- Forward
     oSent.LevL:Set(vFr:Cross(oSent.AxiL))
     oSent.ForL:Normalize(); self:SetNWVector(gsSentHash.."_fdir",oSent.ForL);
@@ -117,10 +151,19 @@ if(SERVER) then
 
   function ENT:Setup(stSpinner)
     local oPhys = self:GetPhysicsObject()
-    -- Mass
-    local nMass = math.Clamp(tonumber(stSpinner.Mass) or 0, 1, 50000)
-    oPhys:SetMass(nMass); self[gsSentHash].Mass = nMass
-
+    if(oPhys and oPhys:IsValid()) then
+      local oSpin = self[gsSentHash]
+      local nMass = math.Clamp(tonumber(stSpinner.Mass) or 1, 1, 50000)
+      oPhys:SetMass(nMass)                     -- Mass
+      oSpin.Prop = stSpinner.Prop              -- Model
+      oSpin.KeyF = stSpinner.KeyF              -- Forward spin key ( positive power )
+      oSpin.KeyR = stSpinner.KeyR              -- Forward spin key ( negative power )
+      self:SetTorqueAxis(stSpinner.AxiL)       -- Axis direction
+      self:SetPower(stSpinner.Power)           -- Torque amount
+      self:SetTorqueLever(stSpinner.LevL)      -- Lever diraction
+      self:SetLever(stSpinner.Lever)           -- Leverage lenght
+    else ErrorNoHalt("ENT.Setup: Physics invalid"); self:Remove(); return false end
+    return true -- Everything is fine !
   end
 
   function self:Think()
@@ -139,18 +182,21 @@ if(SERVER) then
         local Ang = self:GetAngles()
         local oSent = self[gsSentHash]
         local Pw = ((wPw ~= 0) and (wPw / 2) or oSent.Power) * oSent.Dir
-        local Le = (wLe ~= 0) and wLe       or oSent.Lever
+        local Le = ((wLe ~= 0) and wLe       or oSent.Lever)
         local vPwt, vLvt = oSent.PowT, oSent.LevT
         local vFrw, vLvw = oSent.ForW, oSent.LevW
+        local vAxw       = oSent.AxiW
               vFrw:Set(oSent.ForL); vFrw:Rotate(Ang)
               vLvw:Set(oSent.LevL); vLvw:Rotate(Ang)
+              vAxw:Set(oSent.AxiL); vAxw:Rotate(Ang)
         local vCn = oPhys:GetMassCenter(); vCn:Rotate(Ang); vCn:Add(Pos)
+        self:SetNWVector(gsSentHash.."_cen", vCn)
         oPhys:ApplyForceOffset(getPower(vPwt, vFrw,  Pw), getLever(vLvt, vCn, vLvw,  Le))
         oPhys:ApplyForceOffset(getPower(vPwt, vFrw, -Pw), getLever(vLvt, vCn, vLvw, -Le))
         if(WireLib) then
           if(wFr and wFr:Length() > 0) then oPhys:ApplyForceCenter(wFr) end
-          local RPM = oPhys:GetAngleVelocity()
-          WireLib.TriggerOutput(self,"RPM", self:Renew():Collect():Process():Control())
+          local vRPM = oPhys:GetAngleVelocity()
+          WireLib.TriggerOutput(self,"RPM", (vRPM:Dot(vAxw) / 6))
         end
       else ErrorNoHalt("ENT.Think: Physics invalid"); self:Remove(); end
     end
@@ -159,22 +205,35 @@ if(SERVER) then
   local function SpinForward(oPly, oEnt)
     if(not (oEnt and oEnt:IsValid())) then return end
     if(not (oEnt:GetClass() == gsSentHash)) then return end
-    oEnt[gsSentHash].Dir = 1
-    oEnt[gsSentHash].On  = true
+    local Data = oEnt[gsSentHash]
+    if(Data.On and oEnt:IsToggled()) then
+      Data.On = false
+    else
+      Data.Dir = 1
+      Data.On  = true
+    end
   end
 
   local function SpinReverse(oPly, oEnt)
     if(not (oEnt and oEnt:IsValid())) then return end
     if(not (oEnt:GetClass() == gsSentHash)) then return end
-    oEnt[gsSentHash].Dir = -1
-    oEnt[gsSentHash].On  = true
+    local Data = oEnt[gsSentHash]
+    if(Data.On and oEnt:IsToggled()) then
+      Data.On = false
+    else
+      Data.Dir = -1
+      Data.On  = true
+    end
   end
 
   local function SpinStop(oPly, oEnt)
     if(not (oEnt and oEnt:IsValid())) then return end
     if(not (oEnt:GetClass() == gsSentHash)) then return end
-    oEnt[gsSentHash].Dir = 0
-    oEnt[gsSentHash].On  = false
+    local Data = oEnt[gsSentHash]
+    if(not oEnt:IsToggled()) then
+      Data.Dir = 0
+      Data.On  = false
+    else
   end
 
   numpad.Register(gsSentHash.."_SpinForward_On" , SpinForward)
