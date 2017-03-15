@@ -83,7 +83,7 @@ end
 
 function ENT:IsToggled()
   if(SERVER)     then local oSpin = self[gsSentHash]; return oSpin.Togg
-  elseif(CLIENT) then return false end
+  elseif(CLIENT) then return self:GetNWVector(gsSentHash.."_togg") end
 end
 
 if(SERVER) then
@@ -149,6 +149,10 @@ if(SERVER) then
     oSent.LevL:Normalize(); self:SetNWVector(gsSentHash.."_ldir",oSent.LevL); return true
   end
 
+  function ENT:SetToggled(bTogg)
+    local oSent = self[gsSentHash]; oSent.Togg = tobool(bTogg) or false
+    self:SetNWBool(gsSentHash.."_togg", oSent.Togg) end
+
   function ENT:Setup(stSpinner)
     local oPhys = self:GetPhysicsObject()
     if(oPhys and oPhys:IsValid()) then
@@ -158,6 +162,7 @@ if(SERVER) then
       oSpin.Prop = stSpinner.Prop              -- Model
       oSpin.KeyF = stSpinner.KeyF              -- Forward spin key ( positive power )
       oSpin.KeyR = stSpinner.KeyR              -- Forward spin key ( negative power )
+      self:SetToggled(stSpinner.Togg)          -- Is it going to be toggled
       self:SetTorqueAxis(stSpinner.AxiL)       -- Axis direction
       self:SetPower(stSpinner.Power)           -- Torque amount
       self:SetTorqueLever(stSpinner.LevL)      -- Lever diraction
@@ -229,8 +234,8 @@ if(SERVER) then
   local function SpinStop(oPly, oEnt)
     if(not (oEnt and oEnt:IsValid())) then return end
     if(not (oEnt:GetClass() == gsSentHash)) then return end
-    local Data = oEnt[gsSentHash]
     if(not oEnt:IsToggled()) then
+      local Data = oEnt[gsSentHash]
       Data.Dir = 0
       Data.On  = false
     else
