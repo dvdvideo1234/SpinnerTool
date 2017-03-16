@@ -12,17 +12,23 @@ local gsSentHash  = "sent_spinner"
 local gsToolName  = "spinner"
 local gsToolNameU = gsToolName.."_"
 local gsEntLimit  = "spinners"
+local gnMaxMod    = 50000
+local gnMaxMass   = 50000
+local gnMaxRad    = 1000
 local gtPalette
+local VEC_ZERO    = Vector()
+local ANG_ZERO    = Angle ()
 
 if(CLIENT) then
   gtPalette = {}
-  gtPalette["w"] = Color(255,255,255,255)
-  gtPalette["r"] = Color(255, 0 , 0 ,255)
-  gtPalette["g"] = Color( 0 ,255, 0 ,255)
-  gtPalette["b"] = Color( 0 , 0 , 0 ,255)
-  gtPalette["m"] = Color(255, 0 ,255,255)
-  gtPalette["y"] = Color(255,255, 0 ,255)
-  gtPalette["c"] = Color( 0 ,255,255,255)
+  gtPalette["w"]  = Color(255,255,255,255)
+  gtPalette["r"]  = Color(255, 0 , 0 ,255)
+  gtPalette["g"]  = Color( 0 ,255, 0 ,255)
+  gtPalette["b"]  = Color( 0 , 0 , 0 ,255)
+  gtPalette["m"]  = Color(255, 0 ,255,255)
+  gtPalette["y"]  = Color(255,255, 0 ,255)
+  gtPalette["c"]  = Color( 0 ,255,255,255)
+  gtPalette["gh"] = Color(255,255,255,200)
 end
 
 if(SERVER) then
@@ -40,8 +46,8 @@ if(SERVER) then
     eSpin:SetMoveType(MOVETYPE_VPHYSICS)
     eSpin:SetNotSolid(false)
     eSpin:SetModel(stSpinner.Prop)
-    eSpin:SetPos(vPos or Vector())
-    eSpin:SetAngles(aAng or Angle())
+    eSpin:SetPos(vPos or VEC_ZERO)
+    eSpin:SetAngles(aAng or ANG_ZERO)
     eSpin:Spawn()
     eSpin:Activate()
     eSpin:SetRenderMode(RENDERMODE_TRANSALPHA)
@@ -88,6 +94,7 @@ TOOL.ConfigName = nil -- Configure file name (nil for default)
 
 TOOL.ClientConVar = {
   ["mass"      ] = "300",
+  ["ghosting"  ] = "1",
   ["model"     ] = "models/props_phx/trains/tracks/track_1x.mdl",
   ["keyfwd"    ] = "45",
   ["keyrev"    ] = "39",
@@ -97,7 +104,7 @@ TOOL.ClientConVar = {
   ["toggle"    ] = "0",       -- Remain in a spinning state when the numpad is released
   ["diraxis"   ] = "0",       -- Axis  direction ID matched to /pComboAxis/
   ["dirlever"  ] = "0",       -- Lever direction ID matched to /pComboLever/
-  ["drawucs"   ] = "1",       -- Enabled draws the coordinates of the props or spinner parameters
+  ["adviser"   ] = "1",       -- Enabled drawing the coordinates of the props or spinner parameters
   ["nocollide" ] = "0",       -- Enagled creates a no-collision constraint between it and trace
   ["constraint"] = "0",       -- Constraint type matched to /pComboConst/
   ["cusaxis"   ] = "[0,0,0]", -- Local custom spin axis vector
@@ -122,15 +129,19 @@ local function GetDirectionID(nID)
 end
 
 function TOOL:GetCustomAxis()
-  return getVector(self:GetClientNumber("cusaxis"))
+  return getVector(self:GetClientInfo("cusaxis"))
 end
 
 function TOOL:GetCustomLever()
-  return getVector(self:GetClientNumber("cuslever"))
+  return getVector(self:GetClientInfo("cuslever"))
+end
+
+function TOOL:GetGhosting()
+  tobool(self:GetClientNumber("ghosting") or false)
 end
 
 function TOOL:GetMass()
-  return math.Clamp(self:GetClientNumber("mass"),1,100000)
+  return math.Clamp(self:GetClientNumber("mass"),1,gnMaxMass)
 end
 
 function TOOL:GetToggle()
@@ -138,15 +149,15 @@ function TOOL:GetToggle()
 end
 
 function TOOL:GetPower()
-  return math.Clamp(self:GetClientNumber("power"),-100000,100000)
+  return math.Clamp(self:GetClientNumber("power"),-gnMaxMod,gnMaxMod)
 end
 
 function TOOL:GetRadius()
-  return math.Clamp(self:GetClientNumber("radius"),0,1000)
+  return math.Clamp(self:GetClientNumber("radius"),0,gnMaxRad)
 end
 
 function TOOL:GetLever()
-  return math.Clamp(self:GetClientNumber("lever"),0,100000)
+  return math.Clamp(self:GetClientNumber("lever"),0,gnMaxMod)
 end
 
 function TOOL:GetModel()
@@ -158,8 +169,8 @@ function TOOL:GetKeys()
          math.Clamp(self:GetClientNumber("keyrev"),0,255)
 end
 
-function TOOL:GetDrawUCS()
-  return tobool(self:GetClientNumber("drawucs") or false)
+function TOOL:GetAdviser()
+  return tobool(self:GetClientNumber("adviser") or false)
 end
 
 function TOOL:GetLocalUCS()
@@ -175,49 +186,114 @@ function TOOL:GetConstraint()
   return math.floor(math.Clamp(tonumber(self:GetClientNumber("constraint")) or 0,0,3))
 end
 
+-- Updates direction of the spin axis and lever
+function TOOL:UpdateVectors(stSpinner)
+  local dax, dlev = self:GetLocalUCS()
+  if(daxs == 0) then stSpinner.AxiL = self:GetCustomAxis()
+  else               stSpinner.AxiL = GetDirectionID(daxs) end
+  if(dlev == 0) then stSpinner.LevL = self:GetCustomLever()
+  else               stSpinner.LevL = GetDirectionID(dlev) end
+  if(daxs ~= 0 and dlev ~= 0 and -- Do not spawn with invalid user axises
+    math.abs(stSpinner.AxiL:Dot(stSpinner.LevL)) > 0.01) then
+  return false end; return true
+end
+
+-- Returns the hit-normal spawn position and orientation
+function TOOL:GetStateSpawn(oEnt, stTrace)
+  if(not (oEnt and oEnt:IsValid())) then return nil end
+  if(stTrace.Hit) then
+    local vPos, aAng = Vector(), Angle()
+          vPos:Set(stTrace.HitPos); aAng:Set(stTrace.HitNormal:Angle())
+          aAng:RotateAroundAxis(aAng:Right(), 90)
+    local lAxs = oEnt:GetTorqueAxis()
+    local lLev = oEnt:GetTorqueLever()
+    local lAng = (lAxs:Cross(lLev):AngleEx(lAxs))
+    local vOBB = oEnt:OBBMins(); vOBB:Rotate(lAng)
+          vPos:Add(-vOBB.z * stTrace.HitNormal)
+          aAng:Add(lAng); aAng:Normalize()
+    return vPos, vAng
+  else return nil end
+end
+
+-- Creates a constant between spinner and trace
+function TOOL:Constraint(eSpin, stTrace)
+  local trEnt = stTrace and stTrace.Entity
+  if(trEnt and trEnt:IsValid()) then
+    local ncon = self:GetConstraint()
+    local bcol = self:GetNoCollide()
+    local nfor = 0 -- Force  limit ( for now unbreakable )
+    local ntor = 0 -- Torque limit ( for now unbreakable )
+    local nfri = 0 -- Friction     ( for now frictionless )
+    local nbon = stTrace.PhysicsBone
+    local vnrm = stTrace.HitNormal
+    if(ncon == 0 and bcol) then -- NoCollide
+      local C = constraint.NoCollide(eSpin,trEnt,0,nbon)
+      if(C) then eSpin:DeleteOnRemove(C); trEnt:DeleteOnRemove(C); return C end
+    elseif(ncon == 1) then -- Weld
+      local C = constraint.Weld(eSpin,trEnt,0,nbon,nfor,bcol,false)
+      if(C) then eSpin:DeleteOnRemove(C); trEnt:DeleteOnRemove(C); return C end
+    elseif(ncon == 2) then -- Axis
+      local LPos1 = eSpin:GetPhysicsObject():GetMassCenter()
+      local LPos2 = eSpin:LocalToWorld(LPos1); LPos2:Add(vnrm)
+            LPos2:Set(trEnt:WorldToLocal(LPos2))
+      local C = constraint.Axis(eSpin,trEnt,0,nbon,LPos1,LPos2,nfor,ntor,nfri,(bcol and 1 or 0))
+      if(C) then eSpin:DeleteOnRemove(C); trEnt:DeleteOnRemove(C); return C end
+    elseif(ncon == 3) then -- Ball ( At the center of the spinner )
+      local M = eSpin:GetPhysicsObject():GetMassCenter()
+      local C = constraint.Ballsocket(trEnt,eSpin,nbon,0,M,nfor,ntor,(bcol and 1 or 0))
+      if(C) then eSpin:DeleteOnRemove(C); trEnt:DeleteOnRemove(C); return C end
+    else return false end
+  end; return false
+end
+
 function TOOL:LeftClick(stTrace)
   if(CLIENT) then return true end
   if(not stTrace.Hit) then return true end
   local stSpinner = {}
   local ply       = self:GetOwner()
-  local dax, dlev = self:GetLocalUCS()
   local constr    = self:GetConstraint()
-  local nocollide = self:GetNoCollide()
   stSpinner.Mass  = self:GetMass()
   stSpinner.Prop  = self:GetModel()
   stSpinner.Power = self:GetPower()
   stSpinner.Lever = self:GetLever()
   stSpinner.Togg  = self:GetToggle()
+  stSpinner.Rad   = self:GetRadius()
   stSpinner.KeyF, stSpinner.KeyR = self:GetKeys()
   local trEnt = stTrace.Entity
   if(stTrace.HitWorld) then
-    if(daxs == 0) then stSpinner.AxiL = self:GetCustomAxis()
-    else               stSpinner.AxiL = GetDirectionID(daxs) end
-    if(daxs == 0) then stSpinner.AxiL = self:GetCustomLever()
-    else               stSpinner.LevL = GetDirectionID(dlev) end
-    if(daxs ~= 0 and dlev ~= 0 and -- Do not spawn with invalid user axises
-      math.abs(stSpinner.AxiL:Dot(stSpinner.LevL)) > 0.01) then return false end
+    if(not self:UpdateVectors(stSpinner)) then return false end
+    local vPos   = stTrace.HitNormal
+    local aAng   = stTrace.HitNormal:Angle()
+          aAng:RotateAroundAxis(aAng:Right(), 90)
+          aAng:Add((stSpinner.AxiL:Cross(stSpinner.LevL)):AngleEx(stSpinner.AxiL))
     local eSpin = newSpinner(ply, vPos, aAng, stSpinner)
     if(eSpin) then
+      local vPos, aAng = self:GetStateSpawn(eSpin, stTrace)
+      if(not (vPos and aAng)) then eSpin:Remove(); return false end
+      eSpin:SetPos(vPos); eSpin:SetAngles(aAng)
       undo.Create("Spinner")
         undo.AddEntity(eSpin)
-        undo.SetCustomUndoText("Spinner")
+        undo.SetCustomUndoText("Spinner free")
         undo.SetPlayer(ply)
       undo.Finish()
     end
   else
-    if(false and trEnt and trEnt:IsValid()) then
-
-
-      local eSpin = newSpinner(ply, vPos, aAng, stSpinner)
+    if(trEnt and trEnt:IsValid()) then
+      if(not self:UpdateVectors(stSpinner)) then return false end
+      local vPos   = stTrace.HitNormal
+      local aAng   = stTrace.HitNormal:Angle()
+            aAng:RotateAroundAxis(aAng:Right(), 90)
+            aAng:Add((stSpinner.AxiL:Cross(stSpinner.LevL)):AngleEx(stSpinner.AxiL))
+      local eSpin  = newSpinner(ply, vPos, aAng, stSpinner)
       if(eSpin) then
-        if(nocollide) then
-          local cNc = constraint.NoCollide(eSpin, trEnt, 0, stTrace.PhysicsBone)
-          if(cNc) then undo.AddEntity(cNc) end
-        end
+        local vPos, aAng = self:GetStateSpawn(eSpin, stTrace)
+        if(not (vPos and aAng)) then eSpin:Remove(); return false end
+        eSpin:SetPos(vPos); eSpin:SetAngles(aAng)
+        local C = self:Constraint(eSpin, stTrace)
         undo.Create("Spinner")
           undo.AddEntity(eSpin)
-          undo.SetCustomUndoText("Spinner")
+          if(C) then undo.AddEntity(C) end
+          undo.SetCustomUndoText("Spinner link")
           undo.SetPlayer(ply)
         undo.Finish()
       end
@@ -254,8 +330,46 @@ function TOOL:RightClick(stTrace)
   end; return false
 end
 
+function TOOL:UpdateGhost(oEnt, oPly)
+  if(not (oEnt and oEnt:IsValid())) then return end
+  oEnt:SetNoDraw(true)
+  oEnt:DrawShadow(false)
+  oEnt:SetColor(gtPalette["gh"])
+  local stTrace = util.TraceLine(util.GetPlayerTrace(oPly))
+  local trEnt   = stTrace.Entity
+  if(not stTrace.Hit) then return end
+  if(trEnt and trEnt:IsValid()) then
+    local trPhys = trEnt:GetPhysicsObject()
+    if(trPhys and trPhys:IsValid()) then
+      trEnt:SetNWVector(gsToolNameU.."vmc", trPhys:GetMassCenter())
+    end
+  end
+  local vPos, aAng = self:GetStateSpawn(oEnt, stTrace)
+  if(vPos and aAng) then
+    oEnt:SetPos(vPos); oEnt:SetAngles(aAng); oEnt:SetNoDraw(false)
+  else -- Cannot be calculated by some reason
+    local vHit, aHit = stTrace.HitPos, stTrace.HitNormal:Angle()
+          aHit:RotateAroundAxis(aHit:Right(), 90)
+    oEnt:SetPos(vHit); oEnt:SetAngles(aHit); oEnt:SetNoDraw(false)
+  end
+end
+
+function TOOL:Think()
+  local model = self:GetModel() -- Ghost irrelevant
+  local ply   = self:GetOwner()
+  if(util.IsValidModel(model)) then
+    if(self:GetGhosting()) then
+      if(not (self.GhostEntity and
+              self.GhostEntity:IsValid() and
+              self.GhostEntity:GetModel() == model)) then
+        self:MakeGhostEntity(model,VEC_ZERO,ANG_ZERO)
+      end; self:UpdateGhost(self.GhostEntity, ply) -- In client single player the grost is skipped
+    else self:ReleaseGhostEntity() end -- Delete the ghost entity when ghosting is disabled
+  end
+end
+
 function TOOL:DrawHUD()
-  if(self.GetDrawUCS()) then
+  if(self.GetAdviser()) then
     local ply     = LocalPlayer()
     local stTrace = ply:GetEyeTrace()
     local trEnt   = stTrace.Entity
@@ -285,12 +399,12 @@ function TOOL:DrawHUD()
         surface.DrawLine(xyOO.x,xyOO.y,xyFR.x,xyFR.y)
         surface.DrawCircle(xyOO.x,xyOO.y,radc,gtPalette["y"])
       else
-        local vPos = trEnt:GetPos()
+        local vPos = trEnt:GetNWVector(gsToolNameU.."vmc")
         local aAng = trEnt:GetAngles()
         local xyO  = vPos:ToScreen()
-        local xyX  = (vPos + 20 * trEnt:GetForward()):ToScreen()
-        local xyY  = (vPos + 20 * trEnt:GetRight()):ToScreen()
-        local xyZ  = (vPos + 20 * trEnt:GetUp()):ToScreen()
+        local xyX  = (vPos + 30 * trEnt:GetForward()):ToScreen()
+        local xyY  = (vPos + 30 * trEnt:GetRight()):ToScreen()
+        local xyZ  = (vPos + 30 * trEnt:GetUp()):ToScreen()
         surface.SetDrawColor(gtPalette["r"])
         surface.DrawLine(xyO.x,xyO.y,xyX.x,xyX.y)
         surface.SetDrawColor(gtPalette["g"])
@@ -303,17 +417,19 @@ function TOOL:DrawHUD()
   end
 end
 
-local ConVarList = TOOL:BuildConVarList()
+local conVarList = TOOL:BuildConVarList()
 function TOOL.BuildCPanel(CPanel)
   local CurY, pItem = 0 -- pItem is the current panel created
           CPanel:SetName(language.GetPhrase("tool."..gsToolName..".name"))
-  pItem = CPanel:Help   (language.GetPhrase("tool."..gsToolName..".desc")); CurY = CurY + pItem:GetTall() + 2
+  pItem = CPanel:Help   (language.GetPhrase("tool."..gsToolName..".desc"))
+  CurY  = CurY + pItem:GetTall() + 2
 
   pItem = CPanel:AddControl( "ComboBox",{
               MenuButton = 1,
               Folder     = gsToolName,
-              Options    = {["#Default"] = ConVarList},
-              CVars      = table.GetKeys(ConVarList)}); CurY = CurY + pItem:GetTall() + 2
+              Options    = {["#Default"] = conVarList},
+              CVars      = table.GetKeys(conVarList)})
+  CurY  = CurY + pItem:GetTall() + 2
 
   local pComboConst = CPanel:ComboBox("Constraint type", gsToolNameU.."constraint")
         pComboConst:SetPos(2, CurY)
@@ -322,7 +438,7 @@ function TOOL.BuildCPanel(CPanel)
         pComboConst:AddChoice("Weld", 1)
         pComboConst:AddChoice("Axis", 2)
         pComboConst:AddChoice("Ball", 3)
-        CurY = CurY + pComboConst:GetTall() + 2
+  CurY = CurY + pComboConst:GetTall() + 2
 
   local pComboAxis = CPanel:ComboBox("Axis direction", gsToolNameU.."diraxis")
         pComboAxis:SetPos(2, CurY)
@@ -334,7 +450,7 @@ function TOOL.BuildCPanel(CPanel)
         pComboAxis:AddChoice("-X Red  ", 4)
         pComboAxis:AddChoice("-Y Green", 5)
         pComboAxis:AddChoice("-Z Blue ", 6)
-        CurY = CurY + pComboAxis:GetTall() + 2
+  CurY = CurY + pComboAxis:GetTall() + 2
 
   local pComboLever = CPanel:ComboBox("Lever direction", gsToolNameU.."dirlever")
         pComboLever:SetPos(2, CurY)
@@ -346,16 +462,14 @@ function TOOL.BuildCPanel(CPanel)
         pComboLever:AddChoice("-X Red  ", 4)
         pComboLever:AddChoice("-Y Green", 5)
         pComboLever:AddChoice("-Z Blue ", 6)
-        CurY = CurY + pComboLever:GetTall() + 2
+  CurY = CurY + pComboLever:GetTall() + 2
 
-  CPanel:NumSlider("Power: ", gsToolNameU.."power" ,-100000, 100000, 3)
-  CPanel:NumSlider("Lever: ", gsToolNameU.."lever" ,      0, 100000, 3)
-  CPanel:NumSlider("Power: ", gsToolNameU.."radius",      0, 100000, 3)
-
+  CPanel:NumSlider("Power: " , gsToolNameU.."power" ,-gnMaxMod, gnMaxMod, 3)
+  CPanel:NumSlider("Lever: " , gsToolNameU.."lever" ,        0, gnMaxMod, 3)
+  CPanel:NumSlider("Radius: ", gsToolNameU.."radius",        0, gnMaxRad, 3)
   CPanel:CheckBox("NoCollide with trace", gsToolNameU.."nocollide")
-
-
-
+  CPanel:CheckBox("Enable ghosting", gsToolNameU.."nocollide")
+  CPanel:CheckBox("Enable adviser", gsToolNameU.."adviser")
 end
 
 

@@ -8,8 +8,11 @@
  * Defines  : Advanced mortor scripted entity
 ]]--
 
-local gsSentHash    = "sent_spinner"
-local gsVectZero    = Vector()
+local gsSentHash  = "sent_spinner"
+local gsVectZero  = Vector()
+local gnMaxMod    = 50000
+local gnMaxMass   = 50000
+local gnMaxRadius = 1000
 
 ENT.Type            = "anim"
 if (WireLib) then
@@ -95,7 +98,7 @@ if(SERVER) then
     vRes:Set(vVec); vRes:Mul(nNum); vRes:Add(vPos); return vRes end
 
   function ENT:SetPhysRadius(nRad)
-    local nRad = (tonumber(nRad) or 0)
+    local nRad = math.Clamp(tonumber(nRad) or 0, 0, gnMaxRadius)
     if(nRad > 0) then
       local oSent = self[gsSentHash]
       local oPhys = self:GetPhysicsObject()
@@ -109,13 +112,13 @@ if(SERVER) then
 
   function ENT:SetPower(nPow)
     local oSent = self[gsSentHash] -- Magnitude of the spinning force
-    oSent.Power = math.Clamp(((tonumber(nPow) or 0) / 2), -50000, 50000)
+    oSent.Power = math.Clamp(((tonumber(nPow) or 0) / 2), -gnMaxMod, gnMaxMod)
     self:SetNWFloat(gsSentHash.."_power", oSent.Power); return true
   end
 
   function ENT:SetLever(nLev)
     local oSent = self[gsSentHash] -- Magnitude of the spinning force
-    oSent.Lever = math.Clamp((tonumber(nLev) or 0), 0, 50000)
+    oSent.Lever = math.Clamp((tonumber(nLev) or 0), 0, gnMaxMod)
     if(oSent.Lever == 0) then -- Use the half of the bounding box size
       vMin, vMax = oEnt:OBBMins(), oEnt:OBBMaxs()
       oSent.Lever = ((vMax - vMin):Length()) / 2
@@ -157,7 +160,7 @@ if(SERVER) then
     local oPhys = self:GetPhysicsObject()
     if(oPhys and oPhys:IsValid()) then
       local oSpin = self[gsSentHash]
-      local nMass = math.Clamp(tonumber(stSpinner.Mass) or 1, 1, 50000)
+      local nMass = math.Clamp(tonumber(stSpinner.Mass) or 1, 1, gnMaxMass)
       oPhys:SetMass(nMass)                     -- Mass
       oSpin.Prop = stSpinner.Prop              -- Model
       oSpin.KeyF = stSpinner.KeyF              -- Forward spin key ( positive power )
