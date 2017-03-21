@@ -7,7 +7,7 @@
  * Created  : Using tool requirement
  * Defines  : Spinner manager script
 ]]--
-
+local gnRatio     = 1.61803398875
 local gsSentHash  = "sent_spinner"
 local gsToolName  = "spinner"
 local gsToolNameU = gsToolName.."_"
@@ -15,9 +15,9 @@ local gsEntLimit  = "spinners"
 local gnMaxMod    = 50000
 local gnMaxMass   = 50000
 local gnMaxRad    = 1000
-local gtPalette
 local VEC_ZERO    = Vector()
 local ANG_ZERO    = Angle ()
+local gtPalette
 
 if(CLIENT) then
   gtPalette = {}
@@ -54,7 +54,7 @@ if(SERVER) then
     eSpin:SetColor(Color(255,255,255,255))
     eSpin:DrawShadow(true)
     eSpin:PhysWake()
-    eSpin:CallOnRemove("MaglevModuleNumpadCleanup", onMaglevModuleRemove,
+    eSpin:CallOnRemove(gsToolNameU.."NumpadCleanup", onMaglevModuleRemove,
       numpad.OnDown(oPly, stSpinner.KeyF , gsToolNameU.."SpinForward_On" , eSpin ),
       numpad.OnUp  (oPly, stSpinner.KeyF , gsToolNameU.."SpinForward_Off", eSpin ),
       numpad.OnDown(oPly, stSpinner.KeyR , gsToolNameU.."SpinReverse_On" , eSpin ),
@@ -463,6 +463,14 @@ function TOOL.BuildCPanel(CPanel)
         pComboLever:AddChoice("-Y Green", 5)
         pComboLever:AddChoice("-Z Blue ", 6)
   CurY = CurY + pComboLever:GetTall() + 2
+
+  CPanel:AddControl( "Numpad", {  Label = "Key Forward:",
+                  Command = gsToolFile.."keyfwd",
+                  ButtonSize = 10 } );
+
+  CPanel:AddControl( "Numpad", {  Label = "Key Reverse:",
+                  Command = gsToolFile.."keyrev",
+                  ButtonSize = 10 } );
 
   CPanel:NumSlider("Power: " , gsToolNameU.."power" ,-gnMaxMod, gnMaxMod, 3)
   CPanel:NumSlider("Lever: " , gsToolNameU.."lever" ,        0, gnMaxMod, 3)
