@@ -9,7 +9,6 @@
 ]]--
 
 local gsSentHash  = "sent_spinner"
-local gsVectZero  = Vector()
 local gnMaxMod    = 50000
 local gnMaxMass   = 50000
 local gnMaxRadius = 1000

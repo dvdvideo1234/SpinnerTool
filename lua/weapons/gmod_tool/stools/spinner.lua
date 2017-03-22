@@ -165,8 +165,8 @@ function TOOL:GetModel()
 end
 
 function TOOL:GetKeys()
-  return math.Clamp(self:GetClientNumber("keyfwd"),0,255),
-         math.Clamp(self:GetClientNumber("keyrev"),0,255)
+  return math.floor(math.Clamp(self:GetClientNumber("keyfwd"),0,255)),
+         math.floor(math.Clamp(self:GetClientNumber("keyrev"),0,255))
 end
 
 function TOOL:GetAdviser()
@@ -183,7 +183,7 @@ function TOOL:GetNoCollide()
 end
 
 function TOOL:GetConstraint()
-  return math.floor(math.Clamp(tonumber(self:GetClientNumber("constraint")) or 0,0,3))
+  return math.floor(math.Clamp(tonumber(self:GetClientNumber("constraint")) or 0,0,4))
 end
 
 -- Updates direction of the spin axis and lever
@@ -194,8 +194,9 @@ function TOOL:UpdateVectors(stSpinner)
   if(dlev == 0) then stSpinner.LevL = self:GetCustomLever()
   else               stSpinner.LevL = GetDirectionID(dlev) end
   if(daxs ~= 0 and dlev ~= 0 and -- Do not spawn with invalid user axises
-    math.abs(stSpinner.AxiL:Dot(stSpinner.LevL)) > 0.01) then
-  return false end; return true
+    math.abs(stSpinner.AxiL:Dot(stSpinner.LevL)) > 0.01) then return false end
+  if(not (stSpinner.AxiL and stSpinner.LevL)) then return false end
+  return true
 end
 
 -- Returns the hit-normal spawn position and orientation
@@ -226,6 +227,7 @@ function TOOL:Constraint(eSpin, stTrace)
     local nfri = 0 -- Friction     ( for now frictionless )
     local nbon = stTrace.PhysicsBone
     local vnrm = stTrace.HitNormal
+    local hpos = stTrace.HitPos
     if(ncon == 0 and bcol) then -- NoCollide
       local C = constraint.NoCollide(eSpin,trEnt,0,nbon)
       if(C) then eSpin:DeleteOnRemove(C); trEnt:DeleteOnRemove(C); return C end
@@ -239,8 +241,12 @@ function TOOL:Constraint(eSpin, stTrace)
       local C = constraint.Axis(eSpin,trEnt,0,nbon,LPos1,LPos2,nfor,ntor,nfri,(bcol and 1 or 0))
       if(C) then eSpin:DeleteOnRemove(C); trEnt:DeleteOnRemove(C); return C end
     elseif(ncon == 3) then -- Ball ( At the center of the spinner )
-      local M = eSpin:GetPhysicsObject():GetMassCenter()
-      local C = constraint.Ballsocket(trEnt,eSpin,nbon,0,M,nfor,ntor,(bcol and 1 or 0))
+      local L = eSpin:GetPhysicsObject():GetMassCenter()
+      local C = constraint.Ballsocket(trEnt,eSpin,nbon,0,L,nfor,ntor,(bcol and 1 or 0))
+      if(C) then eSpin:DeleteOnRemove(C); trEnt:DeleteOnRemove(C); return C end
+    elseif(ncon == 4) then -- Ball ( At the center of the base )
+      local L = trEnt:WorldToLocal(hpos)
+      local C = constraint.Ballsocket(eSpin,trEnt,nbon,0,L,nfor,ntor,(bcol and 1 or 0))
       if(C) then eSpin:DeleteOnRemove(C); trEnt:DeleteOnRemove(C); return C end
     else return false end
   end; return false
@@ -262,7 +268,7 @@ function TOOL:LeftClick(stTrace)
   local trEnt = stTrace.Entity
   if(stTrace.HitWorld) then
     if(not self:UpdateVectors(stSpinner)) then return false end
-    local vPos   = stTrace.HitNormal
+    local vPos   = stTrace.HitPos
     local aAng   = stTrace.HitNormal:Angle()
           aAng:RotateAroundAxis(aAng:Right(), 90)
           aAng:Add((stSpinner.AxiL:Cross(stSpinner.LevL)):AngleEx(stSpinner.AxiL))
@@ -280,7 +286,7 @@ function TOOL:LeftClick(stTrace)
   else
     if(trEnt and trEnt:IsValid()) then
       if(not self:UpdateVectors(stSpinner)) then return false end
-      local vPos   = stTrace.HitNormal
+      local vPos   = stTrace.HitPos
       local aAng   = stTrace.HitNormal:Angle()
             aAng:RotateAroundAxis(aAng:Right(), 90)
             aAng:Add((stSpinner.AxiL:Cross(stSpinner.LevL)):AngleEx(stSpinner.AxiL))
@@ -435,9 +441,10 @@ function TOOL.BuildCPanel(CPanel)
         pComboConst:SetPos(2, CurY)
         pComboConst:SetTall(20)
         pComboConst:AddChoice("None", 0)
-        pComboConst:AddChoice("Weld", 1)
-        pComboConst:AddChoice("Axis", 2)
-        pComboConst:AddChoice("Ball", 3)
+        pComboConst:AddChoice("Weld TR", 1)
+        pComboConst:AddChoice("Axis TR", 2)
+        pComboConst:AddChoice("Ball SP", 3)
+        pComboConst:AddChoice("Ball TR", 4)
   CurY = CurY + pComboConst:GetTall() + 2
 
   local pComboAxis = CPanel:ComboBox("Axis direction", gsToolNameU.."diraxis")
