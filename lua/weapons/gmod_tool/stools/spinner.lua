@@ -200,9 +200,9 @@ function TOOL:UpdateVectors(stSpinner)
 end
 
 -- Returns the hit-normal spawn position and orientation
-function TOOL:GetStateSpawn(oEnt, stTrace)
-  if(not (oEnt and oEnt:IsValid())) then return nil end
-  if(stTrace.Hit) then
+function TOOL:ApplySpawn(oEnt, stTrace)
+  if(not (oEnt and oEnt:IsValid())) then return false end
+  if(not stTrace.Hit) then oEnt:Remove() return false end
     local vPos, aAng = Vector(), Angle()
           vPos:Set(stTrace.HitPos); aAng:Set(stTrace.HitNormal:Angle())
           aAng:RotateAroundAxis(aAng:Right(), 90)
@@ -212,8 +212,7 @@ function TOOL:GetStateSpawn(oEnt, stTrace)
     local vOBB = oEnt:OBBMins(); vOBB:Rotate(lAng)
           vPos:Add(-vOBB.z * stTrace.HitNormal)
           aAng:Add(lAng); aAng:Normalize()
-    return vPos, vAng
-  else return nil end
+          oEnt:SetPos(vPos); oEnt:SetAngles(aAng); return true
 end
 
 -- Creates a constant between spinner and trace
@@ -274,9 +273,7 @@ function TOOL:LeftClick(stTrace)
           aAng:Add((stSpinner.AxiL:Cross(stSpinner.LevL)):AngleEx(stSpinner.AxiL))
     local eSpin = newSpinner(ply, vPos, aAng, stSpinner)
     if(eSpin) then
-      local vPos, aAng = self:GetStateSpawn(eSpin, stTrace)
-      if(not (vPos and aAng)) then eSpin:Remove(); return false end
-      eSpin:SetPos(vPos); eSpin:SetAngles(aAng)
+      self:ApplySpawn(eSpin, stTrace)
       undo.Create("Spinner")
         undo.AddEntity(eSpin)
         undo.SetCustomUndoText("Spinner free")
@@ -292,9 +289,7 @@ function TOOL:LeftClick(stTrace)
             aAng:Add((stSpinner.AxiL:Cross(stSpinner.LevL)):AngleEx(stSpinner.AxiL))
       local eSpin  = newSpinner(ply, vPos, aAng, stSpinner)
       if(eSpin) then
-        local vPos, aAng = self:GetStateSpawn(eSpin, stTrace)
-        if(not (vPos and aAng)) then eSpin:Remove(); return false end
-        eSpin:SetPos(vPos); eSpin:SetAngles(aAng)
+        self:ApplySpawn(eSpin, stTrace)
         local C = self:Constraint(eSpin, stTrace)
         undo.Create("Spinner")
           undo.AddEntity(eSpin)
@@ -336,6 +331,14 @@ function TOOL:RightClick(stTrace)
   end; return false
 end
 
+function TOOL:Reload(stTrace)
+  if(CLIENT) then return true end
+  if(not stTrace.Hit) then return true end
+  local trEnt = stTrace.Entity
+  if(trEnt and trEnt:IsValid() and trEnt:GetClass() == gsSentHash) then trEnt:Remove() end
+  return true
+end
+
 function TOOL:UpdateGhost(oEnt, oPly)
   if(not (oEnt and oEnt:IsValid())) then return end
   oEnt:SetNoDraw(true)
@@ -349,22 +352,14 @@ function TOOL:UpdateGhost(oEnt, oPly)
     if(trPhys and trPhys:IsValid()) then
       trEnt:SetNWVector(gsToolNameU.."vmc", trPhys:GetMassCenter())
     end
-  end
-  local vPos, aAng = self:GetStateSpawn(oEnt, stTrace)
-  if(vPos and aAng) then
-    oEnt:SetPos(vPos); oEnt:SetAngles(aAng); oEnt:SetNoDraw(false)
-  else -- Cannot be calculated by some reason
-    local vHit, aHit = stTrace.HitPos, stTrace.HitNormal:Angle()
-          aHit:RotateAroundAxis(aHit:Right(), 90)
-    oEnt:SetPos(vHit); oEnt:SetAngles(aHit); oEnt:SetNoDraw(false)
-  end
+  end; self:ApplySpawn(oEnt, stTrace)
 end
 
 function TOOL:Think()
   local model = self:GetModel() -- Ghost irrelevant
   local ply   = self:GetOwner()
   if(util.IsValidModel(model)) then
-    if(self:GetGhosting()) then
+    if(self:GetGhosting() and self:GetConstraint() ~= 0) then
       if(not (self.GhostEntity and
               self.GhostEntity:IsValid() and
               self.GhostEntity:GetModel() == model)) then
@@ -440,11 +435,11 @@ function TOOL.BuildCPanel(CPanel)
   local pComboConst = CPanel:ComboBox("Constraint type", gsToolNameU.."constraint")
         pComboConst:SetPos(2, CurY)
         pComboConst:SetTall(20)
-        pComboConst:AddChoice("None", 0)
-        pComboConst:AddChoice("Weld TR", 1)
-        pComboConst:AddChoice("Axis TR", 2)
-        pComboConst:AddChoice("Ball SP", 3)
-        pComboConst:AddChoice("Ball TR", 4)
+        pComboConst:AddChoice("Skip link", 0)
+        pComboConst:AddChoice("Weld spinner", 1)
+        pComboConst:AddChoice("Axis normal", 2)
+        pComboConst:AddChoice("Ball spinner", 3)
+        pComboConst:AddChoice("Ball trace", 4)
   CurY = CurY + pComboConst:GetTall() + 2
 
   local pComboAxis = CPanel:ComboBox("Axis direction", gsToolNameU.."diraxis")
