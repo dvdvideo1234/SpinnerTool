@@ -1,0 +1,6 @@
+"AddonInfo"
+{
+  "name" "Spinner Tool"
+  "author_name" "DVD"
+  "info" "Manager of a spinner entity"
+}
