@@ -55,7 +55,7 @@ function ENT:GetTorqueForce()
 end
 
 function ENT:GetCenter()
-  if(SERVER)     then return self:LocalToWorld(self:GetPhysicsObject():GetMassCenter())
+  if(SERVER)     then return self:GetPhysicsObject():GetMassCenter()
   elseif(CLIENT) then return self:GetNWVector(gsSentHash.."_cen") end
 end
 
@@ -113,7 +113,7 @@ if(SERVER) then
 
   function ENT:SetPower(nPow)
     local oSent = self[gsSentHash] -- Magnitude of the spinning force
-    oSent.Power = math.Clamp(((tonumber(nPow) or 0) / 2), -gnMaxMod, gnMaxMod)
+    oSent.Power = math.Clamp((tonumber(nPow) or 0), -gnMaxMod, gnMaxMod)
     self:SetNWFloat(gsSentHash.."_power", oSent.Power); return true
   end
 
@@ -166,6 +166,7 @@ if(SERVER) then
       self:SetPower(stSpinner.Power)           -- Torque amount
       self:SetTorqueLever(stSpinner.LevL)      -- Lever diraction
       self:SetLever(stSpinner.Lever)           -- Leverage lenght
+      self:SetNWVector(gsSentHash.."_cen", oPhys:GetMassCenter())
       local oSpin = self[gsSentHash]
       local nMass = math.Clamp(tonumber(stSpinner.Mass) or 1, 1, gnMaxMass)
       oPhys:SetMass(nMass); oSpin.Mass = nMass -- Mass
@@ -188,16 +189,14 @@ if(SERVER) then
     local On = wOn or oSent.On
     local oPhys = self:GetPhysicsObject()
     local vCn   = self:LocalToWorld(oPhys:GetMassCenter())
-                  self:SetNWVector(gsSentHash.."_cen", vCn)
-    if(On) then
-      if(oPhys and oPhys:IsValid()) then
+    if(oPhys and oPhys:IsValid()) then
+      if(On) then
         local Pos = self:GetPos()
-        local Ang = self:GetAngles()
-        local Pw = ((wPw ~= 0) and (wPw / 2) or oSent.Power) * oSent.Dir
-        local Le = ((wLe ~= 0) and wLe       or oSent.Lever)
+        local Ang  = self:GetAngles()
+        local Pw  = ((wPw ~= 0) and wPw or oSent.Power) * oSent.Dir
+        local Le  = ((wLe ~= 0) and wLe or oSent.Lever)
         local vPwt, vLvt = oSent.PowT, oSent.LevT
-        local vFrw, vLvw = oSent.ForW, oSent.LevW
-        local vAxw       = oSent.AxiW
+        local vFrw, vLvw, vAxw = oSent.ForW, oSent.LevW, oSent.AxiW
               vFrw:Set(oSent.ForL); vFrw:Rotate(Ang)
               vLvw:Set(oSent.LevL); vLvw:Rotate(Ang)
               vAxw:Set(oSent.AxiL); vAxw:Rotate(Ang)
@@ -205,11 +204,9 @@ if(SERVER) then
         oPhys:ApplyForceOffset(getPower(vPwt, vFrw, -Pw), getLever(vLvt, vCn, vLvw, -Le))
         if(WireLib) then -- Take the downforce into account ( if given )
           if(wFr and wFr:Length() > 0) then oPhys:ApplyForceCenter(wFr) end
-          local vRPM = oPhys:GetAngleVelocity()
-          WireLib.TriggerOutput(self,"RPM", (vRPM:Dot(vAxw) / 6))
         end
-      else ErrorNoHalt("ENT.Think: Physics invalid\n"); self:Remove(); end
-    end
+      end; WireLib.TriggerOutput(self,"RPM", oPhys:GetAngleVelocity():Dot(oSent.AxiL) / 6)
+    else ErrorNoHalt("ENT.Think: Physics invalid\n"); self:Remove(); end
     self:NextThink(CurTime() + oSent.Tick); return true
   end
 
