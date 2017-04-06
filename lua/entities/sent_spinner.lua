@@ -203,9 +203,10 @@ if(SERVER) then
         oPhys:ApplyForceOffset(getPower(vPwt, vFrw,  Pw), getLever(vLvt, vCn, vLvw,  Le))
         oPhys:ApplyForceOffset(getPower(vPwt, vFrw, -Pw), getLever(vLvt, vCn, vLvw, -Le))
         if(WireLib) then -- Take the downforce into account ( if given )
-          if(wFr and wFr:Length() > 0) then oPhys:ApplyForceCenter(wFr) end
-        end
-      end; WireLib.TriggerOutput(self,"RPM", oPhys:GetAngleVelocity():Dot(oSent.AxiL) / 6)
+          if(wFr and wFr:Length() > 0) then oPhys:ApplyForceCenter(wFr) end end
+      end
+      if(WireLib) then
+        WireLib.TriggerOutput(self,"RPM", oPhys:GetAngleVelocity():Dot(oSent.AxiL) / 6) end
     else ErrorNoHalt("ENT.Think: Physics invalid\n"); self:Remove(); end
     self:NextThink(CurTime() + oSent.Tick); return true
   end
