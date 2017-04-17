@@ -105,8 +105,10 @@ if(SERVER) then
     local nRad = math.Clamp(tonumber(nRad) or 0, 0, gnMaxRadius)
     if(nRad > 0) then
       local oSent = self[gsSentHash]
+      local vMin  = Vector(-nRad,-nRad,-nRad)
+      local vMax  = Vector( nRad, nRad, nRad)
       self:PhysicsInitSphere(nRad)
-      self:SetCollisionBounds(Vector(-nRad,-nRad,-nRad),Vector(nRad,nRad,nRad))
+      self:SetCollisionBounds(vMin, vMax)
       self:PhysWake(); oSent.Radi = nRad
     end; return true
   end

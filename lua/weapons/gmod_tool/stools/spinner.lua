@@ -14,7 +14,9 @@ local gsToolNameU = gsToolName.."_"
 local gsEntLimit  = "spinners"
 local gnMaxMod    = 50000
 local gnMaxMass   = 50000
-local gnMaxRad    = 1000
+local gnMaxRad    = 500
+local gnMaxLin    = 1000
+local gnMaxAng    = 360
 local VEC_ZERO    = Vector()
 local ANG_ZERO    = Angle ()
 local gtPalette   = {}
@@ -85,6 +87,14 @@ if(CLIENT) then
   language.Add("tool."..gsToolName..".category" , "Construction")
   language.Add("tool."..gsToolName..".name"     , "Spinner tool")
   language.Add("tool."..gsToolName..".desc"     , "Creates/updates a spinner entity")
+  concommand.Add(gsToolNameU.."resetoffs", function(oPly,oCom,oArgs)
+    oPly:ConCommand(gsToolNameU.."linx 0\n")
+    oPly:ConCommand(gsToolNameU.."liny 0\n")
+    oPly:ConCommand(gsToolNameU.."linz 0\n")
+    oPly:ConCommand(gsToolNameU.."angp 0\n")
+    oPly:ConCommand(gsToolNameU.."angy 0\n")
+    oPly:ConCommand(gsToolNameU.."angr 0\n")
+  end)
 end
 
 TOOL.Category   = language and language.GetPhrase("tool."..gsToolName..".category")
@@ -94,6 +104,12 @@ TOOL.ConfigName = nil -- Configure file name (nil for default)
 
 TOOL.ClientConVar = {
   ["mass"      ] = "300",
+  ["linx"      ] = "0",
+  ["liny"      ] = "0",
+  ["linz"      ] = "0",
+  ["angp"      ] = "0",
+  ["angy"      ] = "0",
+  ["angr"      ] = "0",
   ["ghosting"  ] = "1",
   ["model"     ] = "models/props_phx/trains/tracks/track_1x.mdl",
   ["keyfwd"    ] = "45",
@@ -130,6 +146,15 @@ local gtDirectionID = {}
 
 local function GetDirectionID(nID)
   return gtDirectionID[(tonumber(nID) or 0)] or Vector()
+end
+
+function TOOL:GetDeviation()
+  return Vector(math.Clamp(self:GetClientNumber("linx"),-gnMaxLin,gnMaxLin),
+                math.Clamp(self:GetClientNumber("liny"),-gnMaxLin,gnMaxLin),
+                math.Clamp(self:GetClientNumber("linz"),-gnMaxLin,gnMaxLin)),
+         Angle (math.Clamp(self:GetClientNumber("angp"),-gnMaxAng,gnMaxAng),
+                math.Clamp(self:GetClientNumber("angy"),-gnMaxAng,gnMaxAng),
+                math.Clamp(self:GetClientNumber("angr"),-gnMaxAng,gnMaxAng))
 end
 
 function TOOL:GetCustomAxis()
@@ -233,14 +258,17 @@ end
 function TOOL:ApplySpawn(oEnt, stTrace)
   if(not (oEnt and oEnt:IsValid())) then return false end
   if(not stTrace.Hit) then oEnt:Remove() return false end
+  local oPos, oAng   = self:GetDeviation()
   local oPly, trNorm = self:GetOwner(), stTrace.HitNormal
   local vPos, aAng, lAxs, lLev = Vector(), Angle(), self:GetVectors()
-  local lAng = (lAxs:Cross(lLev):AngleEx(lAxs))
-  local vMin, vMax = oEnt:OBBMins(), oEnt:OBBMaxs()
-  vPos:Set(stTrace.HitPos);
-  aAng:Set(oEnt:AlignAngles(oEnt:LocalToWorldAngles(lAng),
+  local lAng, vOBB = (lAxs:Cross(lLev):AngleEx(lAxs)), oEnt:OBBMins()
+  aAng:Set(oEnt:AlignAngles(oEnt:LocalToWorldAngles(lAng + oAng),
            trNorm:Cross(oPly:GetRight()):AngleEx(trNorm)))
-  vPos:Add(math.abs(vMin:Dot(lAxs)) * trNorm)
+  vPos:Set(stTrace.HitPos);
+  vPos:Add((math.abs(vOBB:Dot(lAxs))) * trNorm)
+  vPos:Add(oPos.x * aAng:Forward())
+  vPos:Add(oPos.y * aAng:Right())
+  vPos:Add(oPos.z * aAng:Up())
   aAng:Normalize(); oEnt:SetPos(vPos); oEnt:SetAngles(aAng); return true
 end
 
@@ -305,7 +333,7 @@ function TOOL:LeftClick(stTrace)
       self:ApplySpawn(eSpin, stTrace)
       undo.Create("Spinner")
         undo.AddEntity(eSpin)
-        undo.SetCustomUndoText("Spinner free")
+        undo.SetCustomUndoText("Spinner spawn")
         undo.SetPlayer(ply)
       undo.Finish(); return true
     end
@@ -313,13 +341,13 @@ function TOOL:LeftClick(stTrace)
     if(trEnt and trEnt:IsValid()) then
       if(not self:UpdateVectors(stSpinner)) then return false end
       if(trEnt:GetClass() == gsSentHash) then
-        trEnt:Setup(stSpinner)
+        stSpinner.Radi = 0; trEnt:Setup(stSpinner) -- Do not recreate the physics on update
         ply:SendLua("GAMEMODE:AddNotify(\"Spinner updated !\", NOTIFY_UNDO, 6)")
         ply:SendLua("surface.PlaySound(\"ambient/water/drip"..math.random(1, 4)..".wav\")")
         return true
       end
-      local vPos   = stTrace.HitPos
-      local aAng   = stTrace.HitNormal:Angle()
+      local vPos = stTrace.HitPos
+      local aAng = stTrace.HitNormal:Angle()
             aAng:RotateAroundAxis(aAng:Right(), 90)
             aAng = aAng + (stSpinner.AxiL:Cross(stSpinner.LevL)):AngleEx(stSpinner.AxiL)
       local eSpin  = newSpinner(ply, vPos, aAng, stSpinner)
@@ -329,7 +357,7 @@ function TOOL:LeftClick(stTrace)
         undo.Create("Spinner")
           undo.AddEntity(eSpin)
           if(C) then undo.AddEntity(C) end
-          undo.SetCustomUndoText("Spinner link")
+          undo.SetCustomUndoText("Spinner linked")
           undo.SetPlayer(ply)
         undo.Finish(); return true
       end
@@ -358,7 +386,7 @@ function TOOL:RightClick(stTrace)
       local phEnt = trEnt:GetPhysicsObject()
       ply:ConCommand(gsToolNameU.."power " ..tostring(trEnt:GetPower()).."\n") -- Number
       ply:ConCommand(gsToolNameU.."lever " ..tostring(trEnt:GetLever()).."\n") -- Number
-      ply:ConCommand(gsToolNameU.."toggle "..tostring(trEnt:GetToggle() and 1 or 0).."\n")
+      ply:ConCommand(gsToolNameU.."toggle "..tostring(trEnt:IsToggled() and 1 or 0).."\n")
       ply:ConCommand(gsToolNameU.."mass "  ..tostring(phEnt:GetMass()).."\n")
       ply:SendLua("GAMEMODE:AddNotify(\"Settings retrieved !\", NOTIFY_UNDO, 6)")
       ply:SendLua("surface.PlaySound(\"ambient/water/drip"..math.random(1, 4)..".wav\")"); return true
@@ -395,7 +423,7 @@ function TOOL:Think()
               self.GhostEntity:GetModel() == model)) then
         self:MakeGhostEntity(model,VEC_ZERO,ANG_ZERO)
       end; self:UpdateGhost(self.GhostEntity, ply) -- In client single player the grost is skipped
-    else self:ReleaseGhostEntity(); print(4) end -- Delete the ghost entity when ghosting is disabled
+    else self:ReleaseGhostEntity() end -- Delete the ghost entity when ghosting is disabled
   end
 end
 
@@ -521,10 +549,17 @@ function TOOL.BuildCPanel(CPanel)
                   Command = gsToolNameU.."keyrev",
                   ButtonSize = 10 } );
 
-  CPanel:NumSlider("Mass: " , gsToolNameU.."mass" , 1, gnMaxMass, 3)
-  CPanel:NumSlider("Power: " , gsToolNameU.."power" ,-gnMaxMod, gnMaxMod, 3)
-  CPanel:NumSlider("Lever: " , gsToolNameU.."lever" ,        0, gnMaxMod, 3)
-  CPanel:NumSlider("Radius: ", gsToolNameU.."radius",        0, gnMaxRad, 3)
+  CPanel:NumSlider("Mass: "        , gsToolNameU.."mass"  , 1, gnMaxMass, 3)
+  CPanel:NumSlider("Power: "       , gsToolNameU.."power" ,-gnMaxMod, gnMaxMod, 3)
+  CPanel:NumSlider("Lever: "       , gsToolNameU.."lever" ,        0, gnMaxMod, 3)
+  CPanel:NumSlider("Radius: "      , gsToolNameU.."radius",        0, gnMaxRad, 3)
+  CPanel:Button   ("V Reset offsets V", gsToolNameU.."resetoffs")
+  CPanel:NumSlider("Offset X: "    , gsToolNameU.."linx"  , -gnMaxLin, gnMaxLin, 3)
+  CPanel:NumSlider("Offset Y: "    , gsToolNameU.."liny"  , -gnMaxLin, gnMaxLin, 3)
+  CPanel:NumSlider("Offset Z: "    , gsToolNameU.."linz"  , -gnMaxLin, gnMaxLin, 3)
+  CPanel:NumSlider("Offset pitch: ", gsToolNameU.."angp"  , -gnMaxAng, gnMaxAng, 3)
+  CPanel:NumSlider("Offset yaw: "  , gsToolNameU.."angy"  , -gnMaxAng, gnMaxAng, 3)
+  CPanel:NumSlider("Offset roll: " , gsToolNameU.."angr"  , -gnMaxAng, gnMaxAng, 3)
   CPanel:CheckBox("Toggle", gsToolNameU.."toggle")
   CPanel:CheckBox("NoCollide with trace", gsToolNameU.."nocollide")
   CPanel:CheckBox("Enable ghosting", gsToolNameU.."ghosting")
