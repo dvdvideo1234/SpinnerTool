@@ -123,7 +123,7 @@ if(SERVER) then
     local oSent = self[gsSentHash] -- Magnitude of the spinning force
     oSent.Lever = math.Clamp((tonumber(nLev) or 0), 0, gnMaxMod)
     if(oSent.Lever == 0) then -- Use the half of the bounding box size
-      vMin, vMax = oEnt:OBBMins(), oEnt:OBBMaxs()
+      vMin, vMax = self:OBBMins(), self:OBBMaxs()
       oSent.Lever = ((vMax - vMin):Length()) / 2
     end
     self:SetNWFloat(gsSentHash.."_lever", oSent.Lever); return true
