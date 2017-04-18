@@ -429,25 +429,22 @@ end
 
 function TOOL:DrawHUD()
   if(self:GetAdviser()) then
-    local ply     = LocalPlayer()
-    local stTrace = ply:GetEyeTrace()
-    local trEnt   = stTrace.Entity
-    local ratiom  = (gnRatio * 1000)
-    local ratioc  = (gnRatio - 1) * 100
-    local plyd    = (stTrace.HitPos - ply:GetPos()):Length()
-    local radc    = 1.2 * math.Clamp(ratiom / plyd, 1, ratioc)
+    local ply, ucs = LocalPlayer(), 30
+    local stTrace  = ply:GetEyeTrace()
+    local trEnt    = stTrace.Entity
+    local ratiom   = (gnRatio * 1000)
+    local ratioc   = (gnRatio - 1) * 100
+    local plyd     = (stTrace.HitPos - ply:GetPos()):Length()
+    local radc     = 1.2 * math.Clamp(ratiom / plyd, 1, ratioc)
     if(trEnt and trEnt:IsValid()) then
       local cls   = trEnt:GetClass()
       if(cls == gsSentHash) then
         local aA = trEnt:GetAngles()
         local vO = trEnt:LocalToWorld(trEnt:GetCenter())
         local nP, nL = trEnt:GetPower(), trEnt:GetLever()
-        local nS = 30
-        local nF = nS * (nP / gnMaxMod)
-        local nE = nS * (nP / math.abs(nP))
+        local nF, nE = ucs * (nP / gnMaxMod), ucs * (nP / math.abs(nP))
         local vF, vL, vA = self:RecalculateUCS(trEnt:GetTorqueAxis(), trEnt:GetTorqueLever())
-              vA:Rotate(aA); vL:Rotate(aA); vF:Rotate(aA)
-              vL:Mul(nL); vA:Mul(30)
+              vA:Rotate(aA); vL:Rotate(aA); vF:Rotate(aA); vL:Mul(nL); vA:Mul(ucs)
         local xyOO, xyOA = vO:ToScreen(), (vO + vA):ToScreen()
         local vOL , vOR  = (vO - vL), (vO + vL)
         local xyLL, xyLR = vOL:ToScreen(), vOR:ToScreen()
@@ -478,9 +475,9 @@ function TOOL:DrawHUD()
         end
         local aAng = trEnt:GetAngles()
         local xyO  = vPos:ToScreen()
-        local xyX  = (vPos + 30 * vF):ToScreen()
-        local xyY  = (vPos + 30 * vL):ToScreen()
-        local xyZ  = (vPos + 30 * vA):ToScreen()
+        local xyX  = (vPos + ucs * vF):ToScreen()
+        local xyY  = (vPos + ucs * vL):ToScreen()
+        local xyZ  = (vPos + ucs * vA):ToScreen()
         surface.SetDrawColor(gtPalette["r"])
         surface.DrawLine(xyO.x,xyO.y,xyX.x,xyX.y)
         surface.SetDrawColor(gtPalette["g"])
@@ -510,7 +507,7 @@ function TOOL.BuildCPanel(CPanel)
   local pComboConst = CPanel:ComboBox("Constraint type", gsToolNameU.."constraint")
         pComboConst:SetPos(2, CurY)
         pComboConst:SetTall(20)
-        pComboConst:AddChoice("Skip"        , 0)
+        pComboConst:AddChoice("Skip linking", 0)
         pComboConst:AddChoice("Weld spinner", 1)
         pComboConst:AddChoice("Axis normal" , 2)
         pComboConst:AddChoice("Ball spinner", 3)

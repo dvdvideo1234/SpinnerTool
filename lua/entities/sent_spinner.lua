@@ -147,16 +147,15 @@ if(SERVER) then
     oSent.LevW = Vector() -- World force lever ( Right ) allocate memory
     oSent.ForL = Vector() -- Local force spin direction ( Forward )
     oSent.ForW = Vector() -- World force spin direction ( Forward ) allocate memory
-    oSent.LevL:Set(vDir)  -- Right
-    oSent.LevL:Mul(-1)    -- This is used to fix the orthogonality
-    oSent.ForL:Set(oSent.LevL:Cross(oSent.AxiL)) -- Forward
-    oSent.LevL:Set(oSent.ForL:Cross(oSent.AxiL))
+    oSent.LevL:Set(vDir)  -- Lever direction matched to player right
+    oSent.ForL:Set(oSent.AxiL:Cross(oSent.LevL)) -- Force
+    oSent.LevL:Set(oSent.ForL:Cross(oSent.AxiL)) -- Lever
     oSent.ForL:Normalize(); self:SetNWVector(gsSentHash.."_fdir",oSent.ForL);
     oSent.LevL:Normalize(); self:SetNWVector(gsSentHash.."_ldir",oSent.LevL); return true
   end
 
   function ENT:SetToggled(bTogg)
-    local oSent = self[gsSentHash]; oSent.Togg = tobool(bTogg) or false
+    local oSent = self[gsSentHash]; oSent.Togg = tobool(bTogg or false)
     self:SetNWBool(gsSentHash.."_togg", oSent.Togg) end
 
   function ENT:Setup(stSpinner)
@@ -182,21 +181,20 @@ if(SERVER) then
   function ENT:Think()
     local wOn, wPw, wLe, wFr
     if(WireLib) then
-      wOn = (tobool  (self.Inputs["On"   ].Value) or false)
+      wOn = (tobool  (self.Inputs["On"   ].Value  or false))
       wPw = (tonumber(self.Inputs["Power"].Value) or 0)
       wLe = (tonumber(self.Inputs["Lever"].Value) or 0)
       wFr =           self.Inputs["Force"].Value
     end
     local oSent = self[gsSentHash]
-    local On = wOn or oSent.On
     local oPhys = self:GetPhysicsObject()
     local vCn   = self:LocalToWorld(oPhys:GetMassCenter())
     if(oPhys and oPhys:IsValid()) then
-      if(On) then
+      if(wOn or oSent.On) then
         local Pos = self:GetPos()
-        local Ang  = self:GetAngles()
-        local Pw  = ((wPw ~= 0) and wPw or oSent.Power) * oSent.Dir
-        local Le  = ((wLe ~= 0) and wLe or oSent.Lever)
+        local Ang = self:GetAngles()
+        local Pw  = ((wPw ~= 0) and wPw or (oSent.Power * oSent.Dir))
+        local Le  = ((wLe ~= 0) and wLe or  oSent.Lever)
         local vPwt, vLvt = oSent.PowT, oSent.LevT
         local vFrw, vLvw, vAxw = oSent.ForW, oSent.LevW, oSent.AxiW
               vFrw:Set(oSent.ForL); vFrw:Rotate(Ang)
