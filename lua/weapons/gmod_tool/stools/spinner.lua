@@ -112,6 +112,9 @@ TOOL.ClientConVar = {
   ["angr"      ] = "0",
   ["ghosting"  ] = "1",
   ["model"     ] = "models/props_phx/trains/tracks/track_1x.mdl",
+  ["friction"  ] = "0",
+  ["forcelim"  ] = "0",
+  ["torqulim"  ] = "0",
   ["keyfwd"    ] = "45",
   ["keyrev"    ] = "39",
   ["lever"     ] = "10",
@@ -179,6 +182,18 @@ end
 
 function TOOL:GetPower()
   return math.Clamp(self:GetClientNumber("power"),-gnMaxMod,gnMaxMod)
+end
+
+function TOOL:GetFriction()
+  return math.Clamp(self:GetClientNumber("friction"),0,gnMaxMod)
+end
+
+function TOOL:GetForceLimit()
+  return math.Clamp(self:GetClientNumber("forcelim"),0,gnMaxMod)
+end
+
+function TOOL:GetTorqueLimit()
+  return math.Clamp(self:GetClientNumber("torqulim"),0,gnMaxMod)
 end
 
 function TOOL:GetRadius()
@@ -278,9 +293,9 @@ function TOOL:Constraint(eSpin, stTrace)
   if(trEnt and trEnt:IsValid()) then
     local ncon = self:GetConstraint()
     local bcol = self:GetNoCollide()
-    local nfor = 0 -- Force  limit ( for now unbreakable )
-    local ntor = 0 -- Torque limit ( for now unbreakable )
-    local nfri = 0 -- Friction     ( for now frictionless )
+    local nfor = self:GetForceLimit()
+    local ntor = self:GetTorqueLimit()
+    local nfri = self:GetFriction()
     local hpos = stTrace.HitPos
     local nbon = stTrace.PhysicsBone
     local vnrm = 1000 * stTrace.HitNormal -- Keep it long to avoid surface displacement
@@ -548,8 +563,11 @@ function TOOL.BuildCPanel(CPanel)
 
   CPanel:NumSlider("Mass: "        , gsToolNameU.."mass"  , 1, gnMaxMass, 3)
   CPanel:NumSlider("Power: "       , gsToolNameU.."power" ,-gnMaxMod, gnMaxMod, 3)
-  CPanel:NumSlider("Lever: "       , gsToolNameU.."lever" ,        0, gnMaxMod, 3)
-  CPanel:NumSlider("Radius: "      , gsToolNameU.."radius",        0, gnMaxRad, 3)
+  CPanel:NumSlider("Friction: "    , gsToolNameU.."friction" , 0, gnMaxMod, 3)
+  CPanel:NumSlider("Force limit: " , gsToolNameU.."forcelim" , 0, gnMaxMod, 3)
+  CPanel:NumSlider("Torque limit: ", gsToolNameU.."torqulim" , 0, gnMaxMod, 3)
+  CPanel:NumSlider("Lever: "       , gsToolNameU.."lever" , 0, gnMaxMod, 3)
+  CPanel:NumSlider("Radius: "      , gsToolNameU.."radius", 0, gnMaxRad, 3)
   CPanel:Button   ("V Reset offsets V", gsToolNameU.."resetoffs")
   CPanel:NumSlider("Offset X: "    , gsToolNameU.."linx"  , -gnMaxLin, gnMaxLin, 3)
   CPanel:NumSlider("Offset Y: "    , gsToolNameU.."liny"  , -gnMaxLin, gnMaxLin, 3)
