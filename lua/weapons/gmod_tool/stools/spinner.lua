@@ -118,6 +118,7 @@ TOOL.ClientConVar = {
   ["keyfwd"    ] = "45",
   ["keyrev"    ] = "39",
   ["lever"     ] = "10",
+  ["levcount"  ] = "2",
   ["power"     ] = "100",     -- Power of the spinner the bigger the faster
   ["radius"    ] = "0",       -- Radius if bigger than zero circular collision is used
   ["toggle"    ] = "0",       -- Remain in a spinning state when the numpad is released
@@ -135,7 +136,7 @@ local function getVector(sV)
   return Vector(tonumber(v[1]) or 0, tonumber(v[2]) or 0, tonumber(v[3]) or 0)
 end
 
-local function setVector(vV)
+local function strVector(vV)
   return "["..tostring(vV.x or 0)..","..tostring(vV.y or 0)..","..tostring(vV.z or 0).."]"
 end
 
@@ -162,6 +163,10 @@ end
 
 function TOOL:GetCustomAxis()
   return getVector(self:GetClientInfo("cusaxis"))
+end
+
+function TOOL:GetLeverCount()
+  return math.floor(math.Clamp(self:GetClientNumber("levcount"), 1, 100))
 end
 
 function TOOL:GetCustomLever()
@@ -240,8 +245,8 @@ function TOOL:GetVectors()
   vA:Normalize(); vL:Normalize(); return vA, vL
 end
 
--- Recalculates the orentarion based on the spin axis and lever axis
--- Upcates force, lever and spin axises to be orthogonal to each other
+-- Recalculates the orientation based on the spin axis and lever axis
+-- Updates force, lever and spin axises to be orthogonal to each other
 -- vA  >> Local vector of the spin axis
 -- vL  >> Local vector of the lever axis
 function TOOL:RecalculateUCS(vA, vL)
@@ -334,6 +339,7 @@ function TOOL:LeftClick(stTrace)
   stSpinner.Lever = self:GetLever()
   stSpinner.Togg  = self:GetToggle()
   stSpinner.Radi  = self:GetRadius()
+  stSpinner.CLev  = self:GetLeverCount()
   stSpinner.KeyF, stSpinner.KeyR = self:GetKeys()
   local trEnt = stTrace.Entity
   if(stTrace.HitWorld) then
@@ -390,8 +396,8 @@ function TOOL:RightClick(stTrace)
     if(cls == "prop_physics") then
       local sPth = string.GetFileFromFilename(trEnt:GetModel())
       local vPos = trEnt:GetPos()
-      local sAxs = setVector(trEnt:WorldToLocal(vPos + stTrace.HitNormal))
-      local sLvr = setVector(trEnt:WorldToLocal(vPos + ply:GetRight()))
+      local sAxs = strVector(trEnt:WorldToLocal(vPos + stTrace.HitNormal))
+      local sLvr = strVector(trEnt:WorldToLocal(vPos + ply:GetRight()))
       ply:ConCommand(gsToolNameU.."cusaxis " ..sAxs.."\n") -- Vector as string
       ply:ConCommand(gsToolNameU.."cuslever "..sLvr.."\n") -- Vector as string
       ply:ConCommand(gsToolNameU.."model "   ..trEnt:GetModel().."\n")
@@ -444,7 +450,7 @@ end
 
 function TOOL:DrawHUD()
   if(self:GetAdviser()) then
-    local ply, ucs = LocalPlayer(), 30
+    local ply, axs = LocalPlayer(), 30
     local stTrace  = ply:GetEyeTrace()
     local trEnt    = stTrace.Entity
     local ratiom   = (gnRatio * 1000)
@@ -452,31 +458,33 @@ function TOOL:DrawHUD()
     local plyd     = (stTrace.HitPos - ply:GetPos()):Length()
     local radc     = 1.2 * math.Clamp(ratiom / plyd, 1, ratioc)
     if(trEnt and trEnt:IsValid()) then
-      local cls   = trEnt:GetClass()
+      local cls    = trEnt:GetClass()
       if(cls == gsSentHash) then
-        local aA = trEnt:GetAngles()
-        local vO = trEnt:LocalToWorld(trEnt:GetCenter())
+        local trAng = trEnt:GetAngles()
+        local trCen = trEnt:LocalToWorld(trEnt:GetSpinCenter())
         local nP, nL = trEnt:GetPower(), trEnt:GetLever()
-        local nF, nE = ucs * (nP / gnMaxMod), ucs * (nP / math.abs(nP))
-        local vF, vL, vA = self:RecalculateUCS(trEnt:GetTorqueAxis(), trEnt:GetTorqueLever())
-              vA:Rotate(aA); vL:Rotate(aA); vF:Rotate(aA); vL:Mul(nL); vA:Mul(ucs)
-        local xyOO, xyOA = vO:ToScreen(), (vO + vA):ToScreen()
-        local vOL , vOR  = (vO - vL), (vO + vL)
-        local xyLL, xyLR = vOL:ToScreen(), vOR:ToScreen()
-        local xyFL, xyFR = (vOL - nF * vF):ToScreen(), (vOR + nF * vF):ToScreen()
-        local xyEL, xyER = (vOL - nE * vF):ToScreen(), (vOR + nE * vF):ToScreen()
+        local nF, nE = axs * (nP / gnMaxMod), axs * (nP / math.abs(nP))
+        local spCnt = trEnt:GetLeverCount()
+        local spAxs = trEnt:GetTorqueAxis()
+        local spLev = trEnt:GetTorqueLever()
+        local wvAxs = Vector(); wvAxs:Set(spAxs); wvAxs:Rotate(trAng)
+        local wvLev = Vector(); wvLev:Set(spLev); wvLev:Rotate(trAng)
+        local dAng, dA = wvLev:AngleEx(wvAxs), (360 / spCnt)
+        local xyOO, xyOA = trCen:ToScreen(), (axs * wvAxs + trCen):ToScreen()
         surface.SetDrawColor(gtPalette["b"])
         surface.DrawLine(xyOO.x,xyOO.y,xyOA.x,xyOA.y)
-        surface.SetDrawColor(gtPalette["g"])
-        surface.DrawLine(xyOO.x,xyOO.y,xyLR.x,xyLR.y)
-        surface.DrawLine(xyOO.x,xyOO.y,xyLL.x,xyLL.y)
-        surface.SetDrawColor(gtPalette["y"])
-        surface.DrawLine(xyLR.x,xyLR.y,xyFR.x,xyFR.y)
-        surface.DrawLine(xyLL.x,xyLL.y,xyFL.x,xyFL.y)
-        surface.SetDrawColor(gtPalette["r"])
-        surface.DrawLine(xyFR.x,xyFR.y,xyER.x,xyER.y)
-        surface.DrawLine(xyFL.x,xyFL.y,xyEL.x,xyEL.y)
         surface.DrawCircle(xyOO.x,xyOO.y,radc,gtPalette["y"])
+        for ID = 1, spCnt do
+          xyLE = ( nL * dAng:Forward() + trCen):ToScreen()
+          xyFF = ((-nF * nP) * dAng:Right() + trCen):ToScreen()
+          xyFE = ((-nE * nP) * dAng:Right() + trCen):ToScreen()
+          surface.SetDrawColor(gtPalette["g"])
+          surface.DrawLine(xyOO.x,xyOO.y,xyLE.x,xyLE.y)
+          surface.SetDrawColor(gtPalette["y"])
+          surface.DrawLine(xyOO.x,xyOO.y,xyFF.x,xyFF.y)
+          surface.SetDrawColor(gtPalette["r"])
+          surface.DrawLine(xyFF.x,xyFF.y,xyFE.x,xyFE.y)
+        end
       elseif(cls == "prop_physics") then
         local vF, vL, vA, vPos
         local daxs, dlev = self:GetDirectionID()
@@ -490,9 +498,9 @@ function TOOL:DrawHUD()
         end
         local aAng = trEnt:GetAngles()
         local xyO  = vPos:ToScreen()
-        local xyX  = (vPos + ucs * vF):ToScreen()
-        local xyY  = (vPos + ucs * vL):ToScreen()
-        local xyZ  = (vPos + ucs * vA):ToScreen()
+        local xyX  = (vPos + axs * vF):ToScreen()
+        local xyY  = (vPos + axs * vL):ToScreen()
+        local xyZ  = (vPos + axs * vA):ToScreen()
         surface.SetDrawColor(gtPalette["r"])
         surface.DrawLine(xyO.x,xyO.y,xyX.x,xyX.y)
         surface.SetDrawColor(gtPalette["g"])
@@ -561,20 +569,21 @@ function TOOL.BuildCPanel(CPanel)
                   Command = gsToolNameU.."keyrev",
                   ButtonSize = 10 } );
 
-  CPanel:NumSlider("Mass: "        , gsToolNameU.."mass"  , 1, gnMaxMass, 3)
-  CPanel:NumSlider("Power: "       , gsToolNameU.."power" ,-gnMaxMod, gnMaxMod, 3)
+  CPanel:NumSlider("Mass: "        , gsToolNameU.."mass"     , 1, gnMaxMass, 3)
+  CPanel:NumSlider("Power: "       , gsToolNameU.."power"    ,-gnMaxMod, gnMaxMod, 3)
   CPanel:NumSlider("Friction: "    , gsToolNameU.."friction" , 0, gnMaxMod, 3)
   CPanel:NumSlider("Force limit: " , gsToolNameU.."forcelim" , 0, gnMaxMod, 3)
   CPanel:NumSlider("Torque limit: ", gsToolNameU.."torqulim" , 0, gnMaxMod, 3)
-  CPanel:NumSlider("Lever: "       , gsToolNameU.."lever" , 0, gnMaxMod, 3)
-  CPanel:NumSlider("Radius: "      , gsToolNameU.."radius", 0, gnMaxRad, 3)
+  CPanel:NumSlider("Lever: "       , gsToolNameU.."lever"    , 0, gnMaxMod, 3)
+  CPanel:NumSlider("Lever count: " , gsToolNameU.."levcount" , 1, gnMaxAng, 3)
+  CPanel:NumSlider("Radius: "      , gsToolNameU.."radius"   , 0, gnMaxRad, 3)
   CPanel:Button   ("V Reset offsets V", gsToolNameU.."resetoffs")
-  CPanel:NumSlider("Offset X: "    , gsToolNameU.."linx"  , -gnMaxLin, gnMaxLin, 3)
-  CPanel:NumSlider("Offset Y: "    , gsToolNameU.."liny"  , -gnMaxLin, gnMaxLin, 3)
-  CPanel:NumSlider("Offset Z: "    , gsToolNameU.."linz"  , -gnMaxLin, gnMaxLin, 3)
-  CPanel:NumSlider("Offset pitch: ", gsToolNameU.."angp"  , -gnMaxAng, gnMaxAng, 3)
-  CPanel:NumSlider("Offset yaw: "  , gsToolNameU.."angy"  , -gnMaxAng, gnMaxAng, 3)
-  CPanel:NumSlider("Offset roll: " , gsToolNameU.."angr"  , -gnMaxAng, gnMaxAng, 3)
+  CPanel:NumSlider("Offset X: "    , gsToolNameU.."linx"     , -gnMaxLin, gnMaxLin, 3)
+  CPanel:NumSlider("Offset Y: "    , gsToolNameU.."liny"     , -gnMaxLin, gnMaxLin, 3)
+  CPanel:NumSlider("Offset Z: "    , gsToolNameU.."linz"     , -gnMaxLin, gnMaxLin, 3)
+  CPanel:NumSlider("Offset pitch: ", gsToolNameU.."angp"     , -gnMaxAng, gnMaxAng, 3)
+  CPanel:NumSlider("Offset yaw: "  , gsToolNameU.."angy"     , -gnMaxAng, gnMaxAng, 3)
+  CPanel:NumSlider("Offset roll: " , gsToolNameU.."angr"     , -gnMaxAng, gnMaxAng, 3)
   CPanel:CheckBox("Toggle", gsToolNameU.."toggle")
   CPanel:CheckBox("NoCollide with trace", gsToolNameU.."nocollide")
   CPanel:CheckBox("Enable ghosting", gsToolNameU.."ghosting")

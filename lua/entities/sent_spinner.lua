@@ -1,11 +1,11 @@
 --[[
- * Label    : The spinner sctipted entity
+ * Label    : The spinner scripted entity
  * Author   : DVD ( dvd_video )
  * Date     : 13-03-2017
  * Location : /lua/entities/sent_spinner.lua
  * Requires : /lua/weapons/gmod_tool/stools/spinner.lua
  * Created  : Using tool requirement
- * Defines  : Advanced mortor scripted entity
+ * Defines  : Advanced motor scripted entity
 ]]--
 
 AddCSLuaFile()
@@ -34,6 +34,11 @@ function ENT:GetPower()
   elseif(CLIENT) then return self:GetNWFloat(gsSentHash.."_power") end
 end
 
+function ENT:GetLeverCount()
+  if(SERVER)     then local oSpin = self[gsSentHash]; return oSpin.CLev
+  elseif(CLIENT) then return self:GetNWVector(gsSentHash.."_lcnt") end
+end
+
 function ENT:GetLever()
   if(SERVER)     then local oSent = self[gsSentHash]; return oSent.Lever
   elseif(CLIENT) then return self:GetNWFloat(gsSentHash.."_lever") end
@@ -54,7 +59,7 @@ function ENT:GetTorqueForce()
   elseif(CLIENT) then return self:GetNWVector(gsSentHash.."_fdir") end
 end
 
-function ENT:GetCenter()
+function ENT:GetSpinCenter()
   if(SERVER)     then return self:GetPhysicsObject():GetMassCenter()
   elseif(CLIENT) then return self:GetNWVector(gsSentHash.."_cen") end
 end
@@ -71,6 +76,7 @@ if(SERVER) then
     self[gsSentHash].On   = false    -- Enable/disable working
     self[gsSentHash].Tick = 0.01     -- Entity ticking interval
     self[gsSentHash].Dir  = 0        -- Power sign for reverse support
+    self[gsSentHash].CLev = 0        -- Spinner lever count
     self[gsSentHash].Togg = false    -- Toggle the spinner
     self[gsSentHash].PowT = Vector() -- Temporary power vector
     self[gsSentHash].LevT = Vector() -- Temporary lever vector
@@ -85,13 +91,19 @@ if(SERVER) then
         "Lever",
         "Force"
       }, { "NORMAL", "NORMAL", "NORMAL", "VECTOR"}, {
-        "Srart/stop",
-        "Force pair spin magnitude",
-        "Force pair spin leverage",
-        "Force applyed in the center"
+        " Start/Stop ",
+        " Force pair spin magnitude "  ,
+        " Force pair spin leverage "   ,
+        " Force applied in the center ",
+        " Spinner rotation axis "
       })
-      WireLib.CreateSpecialOutputs(self,
-        {"RPM"}, {"NORMAL"}, {"Revolutions per minute"})
+      WireLib.CreateSpecialOutputs(self,{
+        "RPM",
+        "Axis"
+      }, { "NORMAL", "VECTOR"}, {
+        " Revolutions per minute ",
+        " Spinner rotation axis "
+      })
     end; return true
   end
 
@@ -139,19 +151,31 @@ if(SERVER) then
     self:SetNWVector(gsSentHash.."_adir",oSent.AxiL); return true
   end
 
-  function ENT:SetTorqueLever(vDir)
+  function ENT:SetTorqueLever(vDir, vCnt)
     local oSent = self[gsSentHash]
+    local nCnt  = (tonumber(nCnt) or 0)
+    if(nCnt <= 0) then
+      ErrorNoHalt("ENT.SetTorqueLever: Lever count invalid\n"); self:Remove(); return false end
     if(vDir:Length() == 0) then
       ErrorNoHalt("ENT.SetTorqueLever: Force lever invalid\n"); self:Remove(); return false end
-    oSent.LevL = Vector() -- Local force lever ( Right )
-    oSent.LevW = Vector() -- World force lever ( Right ) allocate memory
-    oSent.ForL = Vector() -- Local force spin direction ( Forward )
-    oSent.ForW = Vector() -- World force spin direction ( Forward ) allocate memory
-    oSent.LevL:Set(vDir)  -- Lever direction matched to player right
-    oSent.ForL:Set(oSent.AxiL:Cross(oSent.LevL)) -- Force
-    oSent.LevL:Set(oSent.ForL:Cross(oSent.AxiL)) -- Lever
-    oSent.ForL:Normalize(); self:SetNWVector(gsSentHash.."_fdir",oSent.ForL);
-    oSent.LevL:Normalize(); self:SetNWVector(gsSentHash.."_ldir",oSent.LevL); return true
+    oSent.LevL = {}       -- Local force lever list (right)
+    oSent.ForL = {}       -- Local force spin direction list (forward)
+    oSpin.CLev = nCnt     -- How many spinner levers do we have (allocate)
+    oSent.LevW = Vector() -- World force lever (right)(allocate memory)(temporary)
+    oSent.ForW = Vector() -- World force spin direction (forward)(allocate memory)(temporary)
+    oSent.LevW:Set(vDir)  -- Lever direction matched to player right
+    oSent.ForW:Set(oSent.AxiL:Cross(oSent.LevW)) -- Force
+    oSent.LevW:Set(oSent.ForW:Cross(oSent.AxiL)) -- Lever
+    oSent.ForW:Normalize(); oSent.LevW:Normalize()
+    self:SetNWInt(gsSentHash.."_lcnt",oSent.LevL)
+    self:SetNWVector(gsSentHash.."_ldir",oSent.LevW)
+    local dAng, dA = oSent.LevW:AngleEx(oSent.AxiL), (360 / nCnt)
+    for ID = 1, nCnt do
+      oSent.LevL[ID] = dAng:Forward()
+      oSent.ForL[ID] = dAng:Right()
+      oSent.ForL[ID]:Mul(-1)
+      dAng:RotateAroundAxis(oSent.AxiL, -dA)
+    end; return true
   end
 
   function ENT:SetToggled(bTogg)
@@ -165,8 +189,8 @@ if(SERVER) then
       self:SetToggled(stSpinner.Togg)          -- Is it going to be toggled
       self:SetTorqueAxis(stSpinner.AxiL)       -- Axis direction
       self:SetPower(stSpinner.Power)           -- Torque amount
-      self:SetTorqueLever(stSpinner.LevL)      -- Lever diraction
-      self:SetLever(stSpinner.Lever)           -- Leverage lenght
+      self:SetTorqueLever(stSpinner.LevL, stSpinner.CLev) -- Lever direction and count
+      self:SetLever(stSpinner.Lever)           -- Leverage length
       self:SetNWVector(gsSentHash.."_cen", oPhys:GetMassCenter())
       local oSpin = self[gsSentHash]
       local nMass = math.Clamp(tonumber(stSpinner.Mass) or 1, 1, gnMaxMass)
@@ -175,35 +199,44 @@ if(SERVER) then
       oSpin.KeyF = stSpinner.KeyF              -- Forward spin key ( positive power )
       oSpin.KeyR = stSpinner.KeyR              -- Forward spin key ( negative power )
     else ErrorNoHalt("ENT.Setup: Physics invalid\n"); self:Remove(); return false end
-    return true -- Everything is fine !
+    collectgarbage(); return true -- Everything is fine !
+  end
+
+  function ENT:GetWireInput(sIn)
+    tIn = self.Inputs[sIn] -- If a cable is connected *.Src is valid.
+    return ((tIn and IsValid(tIn.Src)) and tIn.Value or nil)
   end
 
   function ENT:Think()
     local wOn, wPw, wLe, wFr
     if(WireLib) then
-      wOn = (tobool  (self.Inputs["On"   ].Value  or false))
-      wPw = (tonumber(self.Inputs["Power"].Value) or 0)
-      wLe = (tonumber(self.Inputs["Lever"].Value) or 0)
-      wFr =           self.Inputs["Force"].Value
+      wOn = self:GetWireInput("On")
+      wPw = self:GetWireInput("Power")
+      wLe = self:GetWireInput("Lever")
+      wFr = self:GetWireInput("Force")
     end
     local oSent = self[gsSentHash]
     local oPhys = self:GetPhysicsObject()
     local vCn   = self:LocalToWorld(oPhys:GetMassCenter())
+    local seOn  = (wOn and ((wOn ~= 0) and true or false) or oSent.On)
     if(oPhys and oPhys:IsValid()) then
-      if(wOn or oSent.On) then
+      if(seOn) then
         local Pos = self:GetPos()
         local Ang = self:GetAngles()
-        local Pw  = ((wPw ~= 0) and wPw or (oSent.Power * oSent.Dir))
-        local Le  = ((wLe ~= 0) and wLe or  oSent.Lever)
+        local Pw  = (wPw and wPw or (oSent.Power * oSent.Dir))
+        local Le  = (wLe and wLe or  oSent.Lever)
         local vPwt, vLvt = oSent.PowT, oSent.LevT
         local vFrw, vLvw, vAxw = oSent.ForW, oSent.LevW, oSent.AxiW
-              vFrw:Set(oSent.ForL); vFrw:Rotate(Ang)
-              vLvw:Set(oSent.LevL); vLvw:Rotate(Ang)
               vAxw:Set(oSent.AxiL); vAxw:Rotate(Ang)
-        oPhys:ApplyForceOffset(getPower(vPwt, vFrw,  Pw), getLever(vLvt, vCn, vLvw,  Le))
-        oPhys:ApplyForceOffset(getPower(vPwt, vFrw, -Pw), getLever(vLvt, vCn, vLvw, -Le))
-        if(WireLib) then -- Take the downforce into account ( if given )
-          if(wFr and wFr:Length() > 0) then oPhys:ApplyForceCenter(wFr) end end
+        for ID = 1, oSent.CLev do
+          vFrw:Set(oSent.ForL[ID]); vFrw:Rotate(Ang)
+          vLvw:Set(oSent.LevL[ID]); vLvw:Rotate(Ang)
+          oPhys:ApplyForceOffset(getPower(vPwt, vFrw, Pw), getLever(vLvt, vCn, vLvw, Le))
+        end
+        if(WireLib) then -- Take the down-force into account ( if given )
+          if(wFr and wFr:Length() > 0) then oPhys:ApplyForceCenter(wFr) end
+          WireLib.TriggerOutput(self, "Axis", vAxw)
+        end
       end
       if(WireLib) then
         WireLib.TriggerOutput(self,"RPM", oPhys:GetAngleVelocity():Dot(oSent.AxiL) / 6) end
