@@ -448,6 +448,15 @@ function TOOL:Think()
   end
 end
 
+local function drawLineSpinner(xyS, xyE, sCl)
+  surface.SetDrawColor(sCl and gtPalette[sCl] or gtPalette["w"])
+  surface.DrawLine(xyS.x,xyS.y,xyE.xyE.y)
+end
+
+local function drawCircleSpinner(xyO, nRad, sCl)
+  surface.DrawCircle(xyO.x, xyO.y, nRad, sCl and gtPalette[sCl] or gtPalette["w"])
+end
+
 function TOOL:DrawHUD()
   if(self:GetAdviser()) then
     local ply, axs = LocalPlayer(), 30
@@ -471,19 +480,17 @@ function TOOL:DrawHUD()
         local wvLev = Vector(); wvLev:Set(spLev); wvLev:Rotate(trAng)
         local dAng, dA = wvLev:AngleEx(wvAxs), (360 / spCnt)
         local xyOO, xyOA = trCen:ToScreen(), (axs * wvAxs + trCen):ToScreen()
-        surface.SetDrawColor(gtPalette["b"])
-        surface.DrawLine(xyOO.x,xyOO.y,xyOA.x,xyOA.y)
-        surface.DrawCircle(xyOO.x,xyOO.y,radc,gtPalette["y"])
+        drawLineSpinner(xyOO, xyLE, "b")
+        drawCircleSpinner(xyOO, radc, "y")
         for ID = 1, spCnt do
-          xyLE = ( nL * dAng:Forward() + trCen):ToScreen()
-          xyFF = ((-nF * nP) * dAng:Right() + trCen):ToScreen()
-          xyFE = ((-nE * nP) * dAng:Right() + trCen):ToScreen()
-          surface.SetDrawColor(gtPalette["g"])
-          surface.DrawLine(xyOO.x,xyOO.y,xyLE.x,xyLE.y)
-          surface.SetDrawColor(gtPalette["y"])
-          surface.DrawLine(xyOO.x,xyOO.y,xyFF.x,xyFF.y)
-          surface.SetDrawColor(gtPalette["r"])
-          surface.DrawLine(xyFF.x,xyFF.y,xyFE.x,xyFE.y)
+          local vlAn = dAng:Forward()
+          local vfAn = dAng:Right(); vfAn:Mul(-1)
+          local vLev = ((nL * vlAn) + trCen)
+          local vFof = (((nF * nP) * vfAn) + vLev)
+          local vFoe = (((nE * nP) * vfAn) + vLev)
+          local xyLE, xyFF, xyFE = vLev:ToScreen(), vFof:ToScreen(), vFoe:ToScreen()
+          drawLineSpinner(xyOO, xyLE, "g"); drawLineSpinner(xyOO, xyFF, "y")
+          drawLineSpinner(xyFF, xyFE, "r"); dAng:RotateAroundAxis(wvAxs, dA)
         end
       elseif(cls == "prop_physics") then
         local vF, vL, vA, vPos

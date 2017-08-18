@@ -72,15 +72,23 @@ end
 if(SERVER) then
 
   function ENT:Initialize()
-    self[gsSentHash] = {}
-    self[gsSentHash].On   = false    -- Enable/disable working
-    self[gsSentHash].Tick = 0.01     -- Entity ticking interval
-    self[gsSentHash].Dir  = 0        -- Power sign for reverse support
-    self[gsSentHash].CLev = 0        -- Spinner lever count
-    self[gsSentHash].Togg = false    -- Toggle the spinner
-    self[gsSentHash].PowT = Vector() -- Temporary power vector
-    self[gsSentHash].LevT = Vector() -- Temporary lever vector
-    self[gsSentHash].Radi = 0        -- Collision radius
+    self[gsSentHash] = {}, local oSent = self[gsSentHash]
+    oSent.Dir  = 0        -- Power sign for reverse support
+    oSent.CLev = 0        -- How many spinner levers do we have (allocate)
+    oSent.Radi = 0        -- Collision radius
+    oSpin.DAng = 0        -- Store the angle delta to avoid calculating it every frame on SV
+    oSent.Tick = 0.01     -- Entity ticking interval
+    oSent.On   = false    -- Enable/disable working
+    oSent.Togg = false    -- Toggle the spinner
+    oSpin.LAng = Angle()  -- Temporary angle server-side used for rotation
+    oSent.PowT = Vector() -- Temporary power vector
+    oSent.LevT = Vector() -- Temporary lever vector
+    oSent.ForL = Vector() -- Local force spin direction list (forward)
+    oSent.LevL = Vector() -- Local lever list (right)
+    oSent.AxiL = Vector() -- Local spin axis ( Up )
+    oSent.LevW = Vector() -- World lever (right)(allocate memory)(temporary)
+    oSent.ForW = Vector() -- World force spin direction (forward)(allocate memory)(temporary)
+    oSent.AxiW = Vector() -- World spin axis ( Up ) allocate memory
     self:PhysicsInit(SOLID_VPHYSICS)
     self:SetMoveType(MOVETYPE_VPHYSICS)
     self:SetSolid  (SOLID_VPHYSICS)
@@ -145,8 +153,6 @@ if(SERVER) then
     local oSent = self[gsSentHash]
     if(vDir:Length() == 0) then
       ErrorNoHalt("ENT.SetTorqueAxis: Spin axis invalid\n"); self:Remove(); return false end
-    oSent.AxiL = Vector() -- Local spin axis ( Up )
-    oSent.AxiW = Vector() -- World spin axis ( Up ) allocate memory
     oSent.AxiL:Set(vDir); oSent.AxiL:Normalize()
     self:SetNWVector(gsSentHash.."_adir",oSent.AxiL); return true
   end
@@ -158,24 +164,14 @@ if(SERVER) then
       ErrorNoHalt("ENT.SetTorqueLever: Lever count invalid\n"); self:Remove(); return false end
     if(vDir:Length() == 0) then
       ErrorNoHalt("ENT.SetTorqueLever: Force lever invalid\n"); self:Remove(); return false end
-    oSent.LevL = {}       -- Local force lever list (right)
-    oSent.ForL = {}       -- Local force spin direction list (forward)
-    oSpin.CLev = nCnt     -- How many spinner levers do we have (allocate)
-    oSent.LevW = Vector() -- World force lever (right)(allocate memory)(temporary)
-    oSent.ForW = Vector() -- World force spin direction (forward)(allocate memory)(temporary)
-    oSent.LevW:Set(vDir)  -- Lever direction matched to player right
-    oSent.ForW:Set(oSent.AxiL:Cross(oSent.LevW)) -- Force
-    oSent.LevW:Set(oSent.ForW:Cross(oSent.AxiL)) -- Lever
-    oSent.ForW:Normalize(); oSent.LevW:Normalize()
+    oSpin.CLev = nCnt
+    oSpin.DAng = (360 / nCnt)
+    oSent.LevL:Set(vDir) -- Lever direction matched to player right
+    oSent.ForL:Set(oSent.AxiL:Cross(oSent.LevL)) -- Force
+    oSent.LevL:Set(oSent.ForL:Cross(oSent.AxiL)) -- Lever
+    oSent.ForL:Normalize(); oSent.LevL:Normalize()
     self:SetNWInt(gsSentHash.."_lcnt",oSent.LevL)
-    self:SetNWVector(gsSentHash.."_ldir",oSent.LevW)
-    local dAng, dA = oSent.LevW:AngleEx(oSent.AxiL), (360 / nCnt)
-    for ID = 1, nCnt do
-      oSent.LevL[ID] = dAng:Forward()
-      oSent.ForL[ID] = dAng:Right()
-      oSent.ForL[ID]:Mul(-1)
-      dAng:RotateAroundAxis(oSent.AxiL, -dA)
-    end; return true
+    self:SetNWVector(gsSentHash.."_ldir",oSent.LevW); return true
   end
 
   function ENT:SetToggled(bTogg)
@@ -202,18 +198,30 @@ if(SERVER) then
     collectgarbage(); return true -- Everything is fine !
   end
 
-  function ENT:GetWireInput(sIn)
-    tIn = self.Inputs[sIn] -- If a cable is connected *.Src is valid.
-    return ((tIn and IsValid(tIn.Src)) and tIn.Value or nil)
+  -- In Wiremod this is done in /registerOperator("iwc", "", "n", function(self, args)/
+  -- https://facepunch.com/showthread.php?t=1566053&p=52298677#post52298677
+  -- https://github.com/wiremod/wire/blob/master/lua/entities/gmod_wire_expression2/core/core.lua#L232
+  function ENT:HasWire(sIn)
+    local tIn = (sIn and self.Inputs[sIn] or nil)
+    return ((tIn and IsValid(tIn.Src)) and tIn or nil)
+  end
+
+  function ENT:ReadWire(sIn)
+    local tIn = self:HasWire(sIn)
+    return (tIn and tIn.Value or nil)
+  end
+
+  function ENT:WriteWire(sOut, anyVal)
+    WireLib.TriggerOutput(self, sOut, anyVal)
   end
 
   function ENT:Think()
     local wOn, wPw, wLe, wFr
     if(WireLib) then
-      wOn = self:GetWireInput("On")
-      wPw = self:GetWireInput("Power")
-      wLe = self:GetWireInput("Lever")
-      wFr = self:GetWireInput("Force")
+      wOn = self:ReadWire("On")
+      wPw = self:ReadWire("Power")
+      wLe = self:ReadWire("Lever")
+      wFr = self:ReadWire("Force")
     end
     local oSent = self[gsSentHash]
     local oPhys = self:GetPhysicsObject()
@@ -226,20 +234,22 @@ if(SERVER) then
         local Pw  = (wPw and wPw or (oSent.Power * oSent.Dir))
         local Le  = (wLe and wLe or  oSent.Lever)
         local vPwt, vLvt = oSent.PowT, oSent.LevT
-        local vFrw, vLvw, vAxw = oSent.ForW, oSent.LevW, oSent.AxiW
-              vAxw:Set(oSent.AxiL); vAxw:Rotate(Ang)
+        local vLew, vAxw, aLev = oSent.LevW, oSent.AxiW, oSpi.LAng
+        vAxw:Set(oSent.AxiL); vAxw:Rotate(Ang)
+        vLvw:Set(oSent.LevL); vLvw:Rotate(Ang)
+        aLev:Set(vLvw:AngleEx(vAxw))
         for ID = 1, oSent.CLev do
-          vFrw:Set(oSent.ForL[ID]); vFrw:Rotate(Ang)
-          vLvw:Set(oSent.LevL[ID]); vLvw:Rotate(Ang)
-          oPhys:ApplyForceOffset(getPower(vPwt, vFrw, Pw), getLever(vLvt, vCn, vLvw, Le))
+          local cLev, cFor = aLev:Forward(), aLev:Right(); cFor:Mul(-1)
+          oPhys:ApplyForceOffset(getPower(vPwt, cFor, Pw), getLever(vLvt, vCn, cLev, Le))
+          aLev:RotateAroundAxis(vAxw, oSent.DAng)
         end
         if(WireLib) then -- Take the down-force into account ( if given )
           if(wFr and wFr:Length() > 0) then oPhys:ApplyForceCenter(wFr) end
-          WireLib.TriggerOutput(self, "Axis", vAxw)
+          self:WriteWire("Axis", vAxw)
         end
       end
       if(WireLib) then
-        WireLib.TriggerOutput(self,"RPM", oPhys:GetAngleVelocity():Dot(oSent.AxiL) / 6) end
+        self:WriteWire("RPM", oPhys:GetAngleVelocity():Dot(oSent.AxiL) / 6) end
     else ErrorNoHalt("ENT.Think: Physics invalid\n"); self:Remove(); end
     self:NextThink(CurTime() + oSent.Tick); return true
   end
