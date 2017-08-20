@@ -100,16 +100,17 @@ if(SERVER) then
         "Force"
       }, { "NORMAL", "NORMAL", "NORMAL", "VECTOR"}, {
         " Start/Stop ",
-        " Force pair spin magnitude "  ,
-        " Force pair spin leverage "   ,
-        " Force applied in the center ",
-        " Spinner rotation axis "
+        " Force spin magnitude ",
+        " Force spin leverage ",
+        " Center force vector "
       })
       WireLib.CreateSpecialOutputs(self,{
-        "RPM",
+        "RPM" ,
+        "Tick",
         "Axis"
-      }, { "NORMAL", "VECTOR"}, {
+      }, { "NORMAL", "NORMAL", "VECTOR"}, {
         " Revolutions per minute ",
+        " CPU time consumption ",
         " Spinner rotation axis "
       })
     end; return true
@@ -216,6 +217,7 @@ if(SERVER) then
   end
 
   function ENT:Think()
+    local enMark = SysTime()
     local wOn, wPw, wLe, wFr
     if(WireLib) then
       wOn = self:ReadWire("On")
@@ -226,17 +228,16 @@ if(SERVER) then
     local oSent = self[gsSentHash]
     local oPhys = self:GetPhysicsObject()
     local vCn   = self:LocalToWorld(oPhys:GetMassCenter())
-    local seOn  = (wOn and ((wOn ~= 0) and true or false) or oSent.On)
     if(oPhys and oPhys:IsValid()) then
-      if(seOn) then
-        local Pos = self:GetPos()
-        local Ang = self:GetAngles()
-        local Pw  = (wPw and wPw or (oSent.Power * oSent.Dir))
-        local Le  = (wLe and wLe or  oSent.Lever)
+      if(wOn ~= nil) then oSent.On = (wOn ~= 0) end
+      if(oSent.On) then -- Disable toggling via numpad
+        local eA = self:GetAngles()
+        local Le = (wLe and wLe or  oSent.Lever)
+        local Pw = (wPw and wPw or (oSent.Power * oSent.Dir))
         local vPwt, vLvt = oSent.PowT, oSent.LevT
         local vLew, vAxw, aLev = oSent.LevW, oSent.AxiW, oSent.LAng
-        vAxw:Set(oSent.AxiL); vAxw:Rotate(Ang)
-        vLew:Set(oSent.LevL); vLew:Rotate(Ang)
+        vAxw:Set(oSent.AxiL); vAxw:Rotate(eA)
+        vLew:Set(oSent.LevL); vLew:Rotate(eA)
         aLev:Set(vLew:AngleEx(vAxw))
         for ID = 1, oSent.CLev do
           local cLev, cFor = aLev:Forward(), aLev:Right(); cFor:Mul(-1)
@@ -247,9 +248,12 @@ if(SERVER) then
           if(wFr and wFr:Length() > 0) then oPhys:ApplyForceCenter(wFr) end
           self:WriteWire("Axis", vAxw)
         end
+        self:SetNWFloat(gsSentHash.."_power", Pw)
+        self:SetNWFloat(gsSentHash.."_lever", Le)
       end
       if(WireLib) then
-        self:WriteWire("RPM", oPhys:GetAngleVelocity():Dot(oSent.AxiL) / 6) end
+        self:WriteWire("Tick", 1000 * (SysTime() - enMark))
+        self:WriteWire("RPM" , oPhys:GetAngleVelocity():Dot(oSent.AxiL) / 6) end
     else ErrorNoHalt("ENT.Think: Physics invalid\n"); self:Remove(); end
     self:NextThink(CurTime() + oSent.Tick); return true
   end

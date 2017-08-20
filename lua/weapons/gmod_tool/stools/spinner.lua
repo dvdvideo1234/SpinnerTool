@@ -487,11 +487,13 @@ function TOOL:DrawHUD()
           local vlAn = dAng:Forward()
           local vfAn = dAng:Right(); vfAn:Mul(-1)
           local vLev = ((nL * vlAn) + trCen)
-          local vFof = ((nF * vfAn) + vLev)
-          local vFoe = ((nE * vfAn) + vLev)
-          local xyLE, xyFF, xyFE = vLev:ToScreen(), vFof:ToScreen(), vFoe:ToScreen()
-          drawLineSpinner(xyOO, xyLE, "g"); drawLineSpinner(xyLE, xyFF, "y")
-          drawLineSpinner(xyFF, xyFE, "r"); dAng:RotateAroundAxis(wvAxs, dA)
+          local xyLE = vLev:ToScreen(); drawLineSpinner(xyOO, xyLE, "g")
+          if(nP ~= 0) then
+            local vFof = ((nF * vfAn) + vLev)
+            local vFoe = ((nE * vfAn) + vLev)
+            local xyFF = vFof:ToScreen(); drawLineSpinner(xyLE, xyFF, "y")
+            local xyFE = vFoe:ToScreen(); drawLineSpinner(xyFF, xyFE, "r")
+          end; dAng:RotateAroundAxis(wvAxs, dA)
         end
       elseif(cls == "prop_physics") then
         local vF, vL, vA, vPos
