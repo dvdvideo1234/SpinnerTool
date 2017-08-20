@@ -35,8 +35,8 @@ function ENT:GetPower()
 end
 
 function ENT:GetLeverCount()
-  if(SERVER)     then local oSpin = self[gsSentHash]; return oSpin.CLev
-  elseif(CLIENT) then return self:GetNWVector(gsSentHash.."_lcnt") end
+  if(SERVER)     then local oSent = self[gsSentHash]; return oSent.CLev
+  elseif(CLIENT) then return self:GetNWInt(gsSentHash.."_lcnt") end
 end
 
 function ENT:GetLever()
@@ -65,22 +65,22 @@ function ENT:GetSpinCenter()
 end
 
 function ENT:IsToggled()
-  if(SERVER)     then local oSpin = self[gsSentHash]; return oSpin.Togg
+  if(SERVER)     then local oSent = self[gsSentHash]; return oSent.Togg
   elseif(CLIENT) then return self:GetNWVector(gsSentHash.."_togg") end
 end
 
 if(SERVER) then
 
   function ENT:Initialize()
-    self[gsSentHash] = {}, local oSent = self[gsSentHash]
+    self[gsSentHash] = {}; local oSent = self[gsSentHash]
     oSent.Dir  = 0        -- Power sign for reverse support
     oSent.CLev = 0        -- How many spinner levers do we have (allocate)
     oSent.Radi = 0        -- Collision radius
-    oSpin.DAng = 0        -- Store the angle delta to avoid calculating it every frame on SV
+    oSent.DAng = 0        -- Store the angle delta to avoid calculating it every frame on SV
     oSent.Tick = 0.01     -- Entity ticking interval
     oSent.On   = false    -- Enable/disable working
     oSent.Togg = false    -- Toggle the spinner
-    oSpin.LAng = Angle()  -- Temporary angle server-side used for rotation
+    oSent.LAng = Angle()  -- Temporary angle server-side used for rotation
     oSent.PowT = Vector() -- Temporary power vector
     oSent.LevT = Vector() -- Temporary lever vector
     oSent.ForL = Vector() -- Local force spin direction list (forward)
@@ -159,19 +159,19 @@ if(SERVER) then
 
   function ENT:SetTorqueLever(vDir, vCnt)
     local oSent = self[gsSentHash]
-    local nCnt  = (tonumber(nCnt) or 0)
+    local nCnt  = (tonumber(vCnt) or 0)
     if(nCnt <= 0) then
       ErrorNoHalt("ENT.SetTorqueLever: Lever count invalid\n"); self:Remove(); return false end
     if(vDir:Length() == 0) then
       ErrorNoHalt("ENT.SetTorqueLever: Force lever invalid\n"); self:Remove(); return false end
-    oSpin.CLev = nCnt
-    oSpin.DAng = (360 / nCnt)
+    oSent.CLev = nCnt
+    oSent.DAng = (360 / nCnt)
     oSent.LevL:Set(vDir) -- Lever direction matched to player right
     oSent.ForL:Set(oSent.AxiL:Cross(oSent.LevL)) -- Force
     oSent.LevL:Set(oSent.ForL:Cross(oSent.AxiL)) -- Lever
     oSent.ForL:Normalize(); oSent.LevL:Normalize()
-    self:SetNWInt(gsSentHash.."_lcnt",oSent.LevL)
-    self:SetNWVector(gsSentHash.."_ldir",oSent.LevW); return true
+    self:SetNWInt(gsSentHash.."_lcnt",oSent.CLev)
+    self:SetNWVector(gsSentHash.."_ldir",oSent.LevL); return true
   end
 
   function ENT:SetToggled(bTogg)
@@ -188,12 +188,12 @@ if(SERVER) then
       self:SetTorqueLever(stSpinner.LevL, stSpinner.CLev) -- Lever direction and count
       self:SetLever(stSpinner.Lever)           -- Leverage length
       self:SetNWVector(gsSentHash.."_cen", oPhys:GetMassCenter())
-      local oSpin = self[gsSentHash]
+      local oSent = self[gsSentHash]
       local nMass = math.Clamp(tonumber(stSpinner.Mass) or 1, 1, gnMaxMass)
-      oPhys:SetMass(nMass); oSpin.Mass = nMass -- Mass
-      oSpin.Prop = stSpinner.Prop              -- Model
-      oSpin.KeyF = stSpinner.KeyF              -- Forward spin key ( positive power )
-      oSpin.KeyR = stSpinner.KeyR              -- Forward spin key ( negative power )
+      oPhys:SetMass(nMass); oSent.Mass = nMass -- Mass
+      oSent.Prop = stSpinner.Prop              -- Model
+      oSent.KeyF = stSpinner.KeyF              -- Forward spin key ( positive power )
+      oSent.KeyR = stSpinner.KeyR              -- Forward spin key ( negative power )
     else ErrorNoHalt("ENT.Setup: Physics invalid\n"); self:Remove(); return false end
     collectgarbage(); return true -- Everything is fine !
   end
@@ -234,10 +234,10 @@ if(SERVER) then
         local Pw  = (wPw and wPw or (oSent.Power * oSent.Dir))
         local Le  = (wLe and wLe or  oSent.Lever)
         local vPwt, vLvt = oSent.PowT, oSent.LevT
-        local vLew, vAxw, aLev = oSent.LevW, oSent.AxiW, oSpi.LAng
+        local vLew, vAxw, aLev = oSent.LevW, oSent.AxiW, oSent.LAng
         vAxw:Set(oSent.AxiL); vAxw:Rotate(Ang)
-        vLvw:Set(oSent.LevL); vLvw:Rotate(Ang)
-        aLev:Set(vLvw:AngleEx(vAxw))
+        vLew:Set(oSent.LevL); vLew:Rotate(Ang)
+        aLev:Set(vLew:AngleEx(vAxw))
         for ID = 1, oSent.CLev do
           local cLev, cFor = aLev:Forward(), aLev:Right(); cFor:Mul(-1)
           oPhys:ApplyForceOffset(getPower(vPwt, cFor, Pw), getLever(vLvt, vCn, cLev, Le))

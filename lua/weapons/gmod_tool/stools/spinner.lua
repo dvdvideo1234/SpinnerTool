@@ -118,7 +118,7 @@ TOOL.ClientConVar = {
   ["keyfwd"    ] = "45",
   ["keyrev"    ] = "39",
   ["lever"     ] = "10",
-  ["levcount"  ] = "2",
+  ["levercnt"  ] = "2",
   ["power"     ] = "100",     -- Power of the spinner the bigger the faster
   ["radius"    ] = "0",       -- Radius if bigger than zero circular collision is used
   ["toggle"    ] = "0",       -- Remain in a spinning state when the numpad is released
@@ -166,7 +166,7 @@ function TOOL:GetCustomAxis()
 end
 
 function TOOL:GetLeverCount()
-  return math.floor(math.Clamp(self:GetClientNumber("levcount"), 1, 100))
+  return math.floor(math.Clamp(self:GetClientNumber("levercnt"), 1, gnMaxAng))
 end
 
 function TOOL:GetCustomLever()
@@ -405,10 +405,11 @@ function TOOL:RightClick(stTrace)
       ply:SendLua("surface.PlaySound(\"ambient/water/drip"..math.random(1, 4)..".wav\")"); return true
     elseif(cls == gsSentHash) then
       local phEnt = trEnt:GetPhysicsObject()
-      ply:ConCommand(gsToolNameU.."power " ..tostring(trEnt:GetPower()).."\n") -- Number
-      ply:ConCommand(gsToolNameU.."lever " ..tostring(trEnt:GetLever()).."\n") -- Number
-      ply:ConCommand(gsToolNameU.."toggle "..tostring(trEnt:IsToggled() and 1 or 0).."\n")
-      ply:ConCommand(gsToolNameU.."mass "  ..tostring(phEnt:GetMass()).."\n")
+      ply:ConCommand(gsToolNameU.."power "   ..tostring(trEnt:GetPower()).."\n") -- Number
+      ply:ConCommand(gsToolNameU.."lever "   ..tostring(trEnt:GetLever()).."\n") -- Number
+      ply:ConCommand(gsToolNameU.."levercnt "..tostring(trEnt:GetLeverCount()).."\n") -- Number
+      ply:ConCommand(gsToolNameU.."toggle "  ..tostring(trEnt:IsToggled() and 1 or 0).."\n")
+      ply:ConCommand(gsToolNameU.."mass "    ..tostring(phEnt:GetMass()).."\n")
       ply:SendLua("GAMEMODE:AddNotify(\"Settings retrieved !\", NOTIFY_UNDO, 6)")
       ply:SendLua("surface.PlaySound(\"ambient/water/drip"..math.random(1, 4)..".wav\")"); return true
     end; return false
@@ -450,7 +451,7 @@ end
 
 local function drawLineSpinner(xyS, xyE, sCl)
   surface.SetDrawColor(sCl and gtPalette[sCl] or gtPalette["w"])
-  surface.DrawLine(xyS.x,xyS.y,xyE.xyE.y)
+  surface.DrawLine(xyS.x, xyS.y, xyE.x, xyE.y)
 end
 
 local function drawCircleSpinner(xyO, nRad, sCl)
@@ -480,16 +481,16 @@ function TOOL:DrawHUD()
         local wvLev = Vector(); wvLev:Set(spLev); wvLev:Rotate(trAng)
         local dAng, dA = wvLev:AngleEx(wvAxs), (360 / spCnt)
         local xyOO, xyOA = trCen:ToScreen(), (axs * wvAxs + trCen):ToScreen()
-        drawLineSpinner(xyOO, xyLE, "b")
+        drawLineSpinner(xyOO, xyOA, "b")
         drawCircleSpinner(xyOO, radc, "y")
         for ID = 1, spCnt do
           local vlAn = dAng:Forward()
           local vfAn = dAng:Right(); vfAn:Mul(-1)
           local vLev = ((nL * vlAn) + trCen)
-          local vFof = (((nF * nP) * vfAn) + vLev)
-          local vFoe = (((nE * nP) * vfAn) + vLev)
+          local vFof = ((nF * vfAn) + vLev)
+          local vFoe = ((nE * vfAn) + vLev)
           local xyLE, xyFF, xyFE = vLev:ToScreen(), vFof:ToScreen(), vFoe:ToScreen()
-          drawLineSpinner(xyOO, xyLE, "g"); drawLineSpinner(xyOO, xyFF, "y")
+          drawLineSpinner(xyOO, xyLE, "g"); drawLineSpinner(xyLE, xyFF, "y")
           drawLineSpinner(xyFF, xyFE, "r"); dAng:RotateAroundAxis(wvAxs, dA)
         end
       elseif(cls == "prop_physics") then
@@ -582,7 +583,7 @@ function TOOL.BuildCPanel(CPanel)
   CPanel:NumSlider("Force limit: " , gsToolNameU.."forcelim" , 0, gnMaxMod, 3)
   CPanel:NumSlider("Torque limit: ", gsToolNameU.."torqulim" , 0, gnMaxMod, 3)
   CPanel:NumSlider("Lever: "       , gsToolNameU.."lever"    , 0, gnMaxMod, 3)
-  CPanel:NumSlider("Lever count: " , gsToolNameU.."levcount" , 1, gnMaxAng, 3)
+  CPanel:NumSlider("Lever count: " , gsToolNameU.."levercnt" , 1, gnMaxAng, 3)
   CPanel:NumSlider("Radius: "      , gsToolNameU.."radius"   , 0, gnMaxRad, 3)
   CPanel:Button   ("V Reset offsets V", gsToolNameU.."resetoffs")
   CPanel:NumSlider("Offset X: "    , gsToolNameU.."linx"     , -gnMaxLin, gnMaxLin, 3)
