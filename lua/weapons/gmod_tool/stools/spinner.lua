@@ -14,7 +14,7 @@ local gsToolNameU = gsToolName.."_"
 local gsEntLimit  = "spinners"
 local gnMaxMod    = 50000
 local gnMaxMass   = 50000
-local gnMaxRad    = 500
+local gnMaxRadius = 1000
 local gnMaxLin    = 1000
 local gnMaxAng    = 360
 local VEC_ZERO    = Vector()
@@ -202,7 +202,7 @@ function TOOL:GetTorqueLimit()
 end
 
 function TOOL:GetRadius()
-  return math.Clamp(self:GetClientNumber("radius"),0,gnMaxRad)
+  return math.Clamp(self:GetClientNumber("radius"),0,gnMaxRadius)
 end
 
 function TOOL:GetLever()
@@ -511,13 +511,10 @@ function TOOL:DrawHUD()
         local xyX  = (vPos + axs * vF):ToScreen()
         local xyY  = (vPos + axs * vL):ToScreen()
         local xyZ  = (vPos + axs * vA):ToScreen()
-        surface.SetDrawColor(gtPalette["r"])
-        surface.DrawLine(xyO.x,xyO.y,xyX.x,xyX.y)
-        surface.SetDrawColor(gtPalette["g"])
-        surface.DrawLine(xyO.x,xyO.y,xyY.x,xyY.y)
-        surface.SetDrawColor(gtPalette["b"])
-        surface.DrawLine(xyO.x,xyO.y,xyZ.x,xyZ.y)
-        surface.DrawCircle(xyO.x,xyO.y,radc,gtPalette["y"])
+        drawLineSpinner(xyO, xyX, "r")
+        drawLineSpinner(xyO, xyY, "g")
+        drawLineSpinner(xyO, xyZ, "b")
+        drawCircleSpinner(xyO,radc,"y")
       end
     end
   end
@@ -586,7 +583,7 @@ function TOOL.BuildCPanel(CPanel)
   CPanel:NumSlider("Torque limit: ", gsToolNameU.."torqulim" , 0, gnMaxMod, 3)
   CPanel:NumSlider("Lever: "       , gsToolNameU.."lever"    , 0, gnMaxMod, 3)
   CPanel:NumSlider("Lever count: " , gsToolNameU.."levercnt" , 1, gnMaxAng, 3)
-  CPanel:NumSlider("Radius: "      , gsToolNameU.."radius"   , 0, gnMaxRad, 3)
+  CPanel:NumSlider("Radius: "      , gsToolNameU.."radius"   , 0, gnMaxRadius, 3)
   CPanel:Button   ("V Reset offsets V", gsToolNameU.."resetoffs")
   CPanel:NumSlider("Offset X: "    , gsToolNameU.."linx"     , -gnMaxLin, gnMaxLin, 3)
   CPanel:NumSlider("Offset Y: "    , gsToolNameU.."liny"     , -gnMaxLin, gnMaxLin, 3)
