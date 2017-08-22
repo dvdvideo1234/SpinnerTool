@@ -7,15 +7,21 @@
  * Created  : Using tool requirement
  * Defines  : Spinner manager script
 ]]--
-local gnRatio      = 1.61803398875
+print("SPINNER:",SysTime())
+
 local gsSentHash   = "sent_spinner"
 local gsSentName   = gsSentHash:gsub("sent_","")
+local gnVarFlags = bit.bor(FCVAR_ARCHIVE, FCVAR_ARCHIVE_XBOX, FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_PRINTABLEONLY)
+local varMaxScale  = CreateConVar("sbox_max"..gsSentName.."_scale" , 50000, gnVarFlags, "Maximum scale for power and lever")
+local varMaxMass   = CreateConVar("sbox_max"..gsSentName.."_mass"  , 50000, gnVarFlags, "The maximum mass the entity can have")
+local varMaxRadius = CreateConVar("sbox_max"..gsSentName.."_radius", 1000, gnVarFlags, "Maximum radius when rebuilding the collision model as sphere")
+local varBroadCast = CreateConVar("sbox_max"..gsSentName.."_broad" , 300, gnVarFlags, "Maximum time when reached the think method sends stuff to client")
+local varTickRate  = CreateConVar("sbox_max"..gsSentName.."_tick" , 5, gnVarFlags, "Maximum sampling time when the spinner is activated. Be careful!")
+
+local gnRatio      = 1.61803398875
 local gsToolName   = gsSentName
 local gsToolNameU  = gsToolName.."_"
 local gsEntLimit   = gsSentName.."s"
-local varMaxScale  = GetConVar("sbox_max"..gsSentName.."_scale")
-local varMaxMass   = GetConVar("sbox_max"..gsSentName.."_mass")
-local varMaxRadius = GetConVar("sbox_max"..gsSentName.."_radius")
 local gnMaxLin     = 1000
 local gnMaxAng     = 360
 local VEC_ZERO     = Vector()

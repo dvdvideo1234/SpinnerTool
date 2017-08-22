@@ -10,14 +10,17 @@
 
 AddCSLuaFile()
 
-local gsSentHash = "sent_spinner"
-local gsSentName = gsSentHash:gsub("sent_","")
-local gnVarFlags = bit.bor(FCVAR_ARCHIVE, FCVAR_ARCHIVE_XBOX, FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_PRINTABLEONLY)
-local varMaxScale  = CreateConVar("sbox_max"..gsSentName.."_scale" , 50000, gnVarFlags, "Maximum scale for power and lever")
-local varMaxMass   = CreateConVar("sbox_max"..gsSentName.."_mass"  , 50000, gnVarFlags, "The maximum mass the entity can have")
-local varMaxRadius = CreateConVar("sbox_max"..gsSentName.."_radius", 1000, gnVarFlags, "Maximum radius when rebuilding the collision model as sphere")
-local varBroadCast = CreateConVar("sbox_max"..gsSentName.."_broad" , 300, gnVarFlags, "Maximum time when reached the think method sends stuff to client")
-local varTickRate  = CreateConVar("sbox_max"..gsSentName.."_tick" , 5, gnVarFlags, "Maximum sampling time when the spinner is activated. Be careful!")
+print("SENT:",SysTime(),RealTime(),CurTime())
+
+local sysNow       = SysTime
+local curNow       = CurTime
+local gsSentHash   = "sent_spinner"
+local gsSentName   = gsSentHash:gsub("sent_","")
+local varMaxScale  = GetConVar("sbox_max"..gsSentName.."_scale")
+local varMaxMass   = GetConVar("sbox_max"..gsSentName.."_mass")
+local varMaxRadius = GetConVar("sbox_max"..gsSentName.."_radius")
+local varBroadCast = GetConVar("sbox_max"..gsSentName.."_broad")
+local varTickRate  = GetConVar("sbox_max"..gsSentName.."_tick")
 
 ENT.Type            = "anim"
 if (WireLib) then
@@ -88,7 +91,8 @@ if(SERVER) then
     oSent.Rate[3] = 0                       -- Start system time [s]
     oSent.Rate[4] = 0                       -- Time execution delta [ms]
     oSent.Rate[5] = 0                       -- Time delta sum for broadcasting [ms]
-    oSent.Rate[6] = 0                       -- Benchmarking duty cycle [] (0-100)%
+    oSent.Rate[6] = 0                       -- The actual time reached for broadcasting [ms]
+    oSent.Rate[7] = 0                       -- Duty cycle (0-100)% of tick rate used for calculations []
     oSent.On   = false    -- Enable/disable working
     oSent.Togg = false    -- Toggle the spinner
     oSent.LAng = Angle()  -- Temporary angle server-side used for rotation
@@ -117,14 +121,12 @@ if(SERVER) then
       })
       WireLib.CreateSpecialOutputs(self,{
         "RPM" ,
-        "Tick",
-        "Duty",
-        "Axis"
-      }, { "NORMAL", "NORMAL", "NORMAL", "VECTOR"}, {
+        "Axis",
+        "Rate"
+      }, { "NORMAL", "VECTOR", "ARRAY"}, {
         " Revolutions per minute ",
-        " CPU time consumption ",
-        " Server execution margin ",
-        " Spinner rotation axis "
+        " Spinner rotation axis ",
+        " Benchmark times and events "
       })
     end; return true
   end
@@ -226,44 +228,47 @@ if(SERVER) then
   end
 
   function ENT:WriteWire(sOut, anyVal)
-    WireLib.TriggerOutput(self, sOut, anyVal)
+    WireLib.TriggerOutput(self, sOut, anyVal); return self
   end
 
   function ENT:TimeTic()
-    local goTime  = SysTime(); oSent.Rate[3] = goTime -- Start time in seconds
-    local toTime  = (oSent.Rate[1] / 1000) -- Sampling time in milliseconds
-    self:NextThink(goTime + toTime) -- Add apples to apples. Thanks Applejack !
-    return self -- Make sure it us enable to cascade it in real-time
+    local tmRate  = self[gsSentHash].Rate
+    local nxTime  = (tmRate[1] / 1000) -- Entity sampling time [s]
+    self:NextThink(curNow() + nxTime) -- Add apples to apples. Thanks Applejack !
+    local goTime  = sysNow(); tmRate[3] = goTime -- Start time [s]
   end
 
   function ENT:TimeToc()
-    local goTime = oSent.Rate[3] -- Start time [s]
-    local toTime = oSent.Rate[1] -- Entity tick rate [ms]
-    local dtTime = (1000 * (SysTime() - goTime)); oSent.Rate[4] = dtTime
+    local tmRate = self[gsSentHash].Rate
+    local toTime = tmRate[1] -- Entity tick rate [ms]
+    local goTime = tmRate[3] -- Start time [s]
+    local snTime = tmRate[5] -- Current time internal for broadcast [ms]
+    local dtTime = (1000 * (sysNow() - goTime)); tmRate[4] = dtTime -- Time execution delta [ms]   
     if(dtTime > toTime) then
       ErrorNoHalt("ENT.Think: Spinner out of time margin\n"); self:Remove(); end
-    oSent.Rate[6] = ((dtTime / toTime) * 100) -- Benchmarking duty cycle
-    return self -- Make sure it us enable to cascade it in real-time
+    tmRate[7] = ((dtTime / toTime) * 100) -- Benchmarking duty cycle
+    snTime = snTime + dtTime; tmRate[5] = snTime
   end
 
   function ENT:TimeNetwork(...)
-    local snTime = oSent.Rate[5] -- Current time internal [ms]
-    local bcTime = oSent.Rate[2] -- Broadcast interval [ms]
-    local dtTime = oSent.Rate[4] -- Time delta for this iteration [ms]
+    local tmRate = self[gsSentHash].Rate
+    local bcTime = tmRate[2] -- Broadcast interval [ms]
+    local snTime = tmRate[5] -- Current time internal for broadcast [ms]
     if(snTime >= bcTime) then
-      local val = unpack(...) -- Values stack for networking
+      local val = {...} -- Values stack for networking
       self:SetNWFloat(gsSentHash.."_power", val[1])
       self:SetNWFloat(gsSentHash.."_lever", val[2])
-      oSent.Rate[5] = 0 -- Register that we are at the beginning and waiting for another event
-    else snTime = snTime + dtTime; oSent.Rate[5] = snTime end
-    return self -- Make sure it us enable to cascade it in real-time
+      tmRate[5] = 0      -- Register that we are at the beginning and waiting for another event
+      tmRate[6] = snTime -- How much time is actually matched to the interval chosen
+    end
   end
 
   function ENT:Think()
-    local oPhys = self:GetPhysicsObject()
-    if(oPhys and oPhys:IsValid()) then self:TimeTic()
-      local oSent, Pw, Le, wFr = self[gsSentHash], 0, 0, nil
-      local vCn = self:LocalToWorld(oPhys:GetMassCenter())
+    self:TimeTic()
+    local oSent = self[gsSentHash]
+    local oPhys, Pw, Le = self:GetPhysicsObject(), 0, 0
+    if(oPhys and oPhys:IsValid()) then
+      local vCn, wFr = self:LocalToWorld(oPhys:GetMassCenter()), nil
       if(WireLib) then wFr = self:ReadWire("Force")
         local wOn = self:ReadWire("On")
         local wPw = self:ReadWire("Power")
@@ -276,8 +281,8 @@ if(SERVER) then
         local vPwt, vLvt, eAng = oSent.PowT, oSent.LevT, self:GetAngles()
         local vLew, vAxw, aLev = oSent.LevW, oSent.AxiW, oSent.LAng
         Le, Pw = oSent.Lever, (oSent.Power * oSent.Dir)
-        vAxw:Set(oSent.AxiL); vAxw:Rotate(eA)
-        vLew:Set(oSent.LevL); vLew:Rotate(eA)
+        vAxw:Set(oSent.AxiL); vAxw:Rotate(eAng)
+        vLew:Set(oSent.LevL); vLew:Rotate(eAng)
         aLev:Set(vLew:AngleEx(vAxw))
         for ID = 1, oSent.CLev do
           local cLev, cFor = aLev:Forward(), aLev:Right(); cFor:Mul(-1)
@@ -291,8 +296,9 @@ if(SERVER) then
       end
       if(WireLib) then
         self:WriteWire("RPM", oPhys:GetAngleVelocity():Dot(oSent.AxiL) / 6) end
-      self:TimeToc():TimeNetwork(Pw, Le)
-    else ErrorNoHalt("ENT.Think: Spinner physics invalid\n"); self:Remove(); end; return true
+    else ErrorNoHalt("ENT.Think: Spinner physics invalid\n"); self:Remove(); end
+    if(WireLib) then self:WriteWire("Rate", oSent.Rate) end
+    self:TimeToc(); self:TimeNetwork(Pw, Le); return true
   end
 
   local function spinForward(oPly, oEnt)
