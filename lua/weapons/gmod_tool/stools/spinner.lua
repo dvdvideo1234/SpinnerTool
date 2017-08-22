@@ -7,19 +7,20 @@
  * Created  : Using tool requirement
  * Defines  : Spinner manager script
 ]]--
-local gnRatio     = 1.61803398875
-local gsSentHash  = "sent_spinner"
-local gsToolName  = "spinner"
-local gsToolNameU = gsToolName.."_"
-local gsEntLimit  = "spinners"
-local gnMaxMod    = 50000
-local gnMaxMass   = 50000
-local gnMaxRadius = 1000
-local gnMaxLin    = 1000
-local gnMaxAng    = 360
-local VEC_ZERO    = Vector()
-local ANG_ZERO    = Angle ()
-local gtPalette   = {}
+local gnRatio      = 1.61803398875
+local gsSentHash   = "sent_spinner"
+local gsSentName   = gsSentHash:gsub("sent_","")
+local gsToolName   = gsSentName
+local gsToolNameU  = gsToolName.."_"
+local gsEntLimit   = gsSentName.."s"
+local varMaxScale  = GetConVar("sbox_max"..gsSentName.."_scale")
+local varMaxMass   = GetConVar("sbox_max"..gsSentName.."_mass")
+local varMaxRadius = GetConVar("sbox_max"..gsSentName.."_radius")
+local gnMaxLin     = 1000
+local gnMaxAng     = 360
+local VEC_ZERO     = Vector()
+local ANG_ZERO     = Angle ()
+local gtPalette    = {}
       gtPalette["w"]  = Color(255,255,255,255)
       gtPalette["r"]  = Color(255, 0 , 0 ,255)
       gtPalette["g"]  = Color( 0 ,255, 0 ,255)
@@ -178,7 +179,7 @@ function TOOL:GetGhosting()
 end
 
 function TOOL:GetMass()
-  return math.Clamp(self:GetClientNumber("mass"),1,gnMaxMass)
+  return math.Clamp(self:GetClientNumber("mass"),1,varMaxMass:GetFloat())
 end
 
 function TOOL:GetToggle()
@@ -186,27 +187,27 @@ function TOOL:GetToggle()
 end
 
 function TOOL:GetPower()
-  return math.Clamp(self:GetClientNumber("power"),-gnMaxMod,gnMaxMod)
+  return math.Clamp(self:GetClientNumber("power"),-varMaxScale:GetFloat(),varMaxScale:GetFloat())
 end
 
 function TOOL:GetFriction()
-  return math.Clamp(self:GetClientNumber("friction"),0,gnMaxMod)
+  return math.Clamp(self:GetClientNumber("friction"),0,varMaxScale:GetFloat())
 end
 
 function TOOL:GetForceLimit()
-  return math.Clamp(self:GetClientNumber("forcelim"),0,gnMaxMod)
+  return math.Clamp(self:GetClientNumber("forcelim"),0,varMaxScale:GetFloat())
 end
 
 function TOOL:GetTorqueLimit()
-  return math.Clamp(self:GetClientNumber("torqulim"),0,gnMaxMod)
+  return math.Clamp(self:GetClientNumber("torqulim"),0,varMaxScale:GetFloat())
 end
 
 function TOOL:GetRadius()
-  return math.Clamp(self:GetClientNumber("radius"),0,gnMaxRadius)
+  return math.Clamp(self:GetClientNumber("radius"),0,varMaxRadius:GetFloat())
 end
 
 function TOOL:GetLever()
-  return math.Clamp(self:GetClientNumber("lever"),0,gnMaxMod)
+  return math.Clamp(self:GetClientNumber("lever"),0,varMaxScale:GetFloat())
 end
 
 function TOOL:GetModel()
@@ -262,11 +263,11 @@ function TOOL:UpdateVectors(stSpinner)
   local vF, vL, vA = self:RecalculateUCS(self:GetVectors())
   if(daxs ~= 0 and dlev ~= 0 and -- Do not spawn with invalid user axises
     math.abs(vA:Dot(vL)) > 0.01) then
-    ErrorNoHalt("TOOL:UpdateVectors: Axis not orthogonal to lever\n"); return false end
-  if(not vA) then
-    ErrorNoHalt("TOOL:UpdateVectors: Spinner axis missing\n"); return false end
-  if(not vL) then
-    ErrorNoHalt("TOOL:UpdateVectors: Spinner lever missing\n"); return false end
+    ErrorNoHalt("TOOL:UpdateVectors: Spinner axis not orthogonal to lever\n"); return false end
+  if(not (type(vA) == "Vector")) then
+    ErrorNoHalt("TOOL:UpdateVectors: Spinner axis missing <"..tostring(vA)..">\n"); return false end
+  if(not (type(vL) == "Vector")) then
+    ErrorNoHalt("TOOL:UpdateVectors: Spinner lever missing <"..tostring(vL)..">\n"); return false end
   if(vA:Length() == 0) then
     ErrorNoHalt("TOOL:UpdateVectors: Spinner axis zero\n"); return false end
   if(vL:Length() == 0) then
@@ -332,7 +333,6 @@ function TOOL:LeftClick(stTrace)
   if(not stTrace.Hit) then return true end
   local stSpinner = {}
   local ply       = self:GetOwner()
-  local constr    = self:GetConstraint()
   stSpinner.Mass  = self:GetMass()
   stSpinner.Prop  = self:GetModel()
   stSpinner.Power = self:GetPower()
@@ -473,7 +473,7 @@ function TOOL:DrawHUD()
         local trAng = trEnt:GetAngles()
         local trCen = trEnt:LocalToWorld(trEnt:GetSpinCenter())
         local nP, nL = trEnt:GetPower(), trEnt:GetLever()
-        local nF, nE = axs * (nP / gnMaxMod), axs * (nP / math.abs(nP))
+        local nF, nE = axs * (nP / varMaxScale:GetFloat()), axs * (nP / math.abs(nP))
         local spCnt = trEnt:GetLeverCount()
         local spAxs = trEnt:GetTorqueAxis()
         local spLev = trEnt:GetTorqueLever()
@@ -576,14 +576,14 @@ function TOOL.BuildCPanel(CPanel)
                   Command = gsToolNameU.."keyrev",
                   ButtonSize = 10 } );
 
-  CPanel:NumSlider("Mass: "        , gsToolNameU.."mass"     , 1, gnMaxMass, 3)
-  CPanel:NumSlider("Power: "       , gsToolNameU.."power"    ,-gnMaxMod, gnMaxMod, 3)
-  CPanel:NumSlider("Friction: "    , gsToolNameU.."friction" , 0, gnMaxMod, 3)
-  CPanel:NumSlider("Force limit: " , gsToolNameU.."forcelim" , 0, gnMaxMod, 3)
-  CPanel:NumSlider("Torque limit: ", gsToolNameU.."torqulim" , 0, gnMaxMod, 3)
-  CPanel:NumSlider("Lever: "       , gsToolNameU.."lever"    , 0, gnMaxMod, 3)
+  CPanel:NumSlider("Mass: "        , gsToolNameU.."mass"     , 1, varMaxMass:GetFloat(), 3)
+  CPanel:NumSlider("Power: "       , gsToolNameU.."power"    ,-varMaxScale:GetFloat(), varMaxScale:GetFloat(), 3)
+  CPanel:NumSlider("Friction: "    , gsToolNameU.."friction" , 0, varMaxScale:GetFloat(), 3)
+  CPanel:NumSlider("Force limit: " , gsToolNameU.."forcelim" , 0, varMaxScale:GetFloat(), 3)
+  CPanel:NumSlider("Torque limit: ", gsToolNameU.."torqulim" , 0, varMaxScale:GetFloat(), 3)
+  CPanel:NumSlider("Lever: "       , gsToolNameU.."lever"    , 0, varMaxScale:GetFloat(), 3)
   CPanel:NumSlider("Lever count: " , gsToolNameU.."levercnt" , 1, gnMaxAng, 3)
-  CPanel:NumSlider("Radius: "      , gsToolNameU.."radius"   , 0, gnMaxRadius, 3)
+  CPanel:NumSlider("Radius: "      , gsToolNameU.."radius"   , 0, varMaxRadius:GetFloat(), 3)
   CPanel:Button   ("V Reset offsets V", gsToolNameU.."resetoffs")
   CPanel:NumSlider("Offset X: "    , gsToolNameU.."linx"     , -gnMaxLin, gnMaxLin, 3)
   CPanel:NumSlider("Offset Y: "    , gsToolNameU.."liny"     , -gnMaxLin, gnMaxLin, 3)

@@ -10,20 +10,23 @@
 
 AddCSLuaFile()
 
-local gsSentHash  = "sent_spinner"
-local gnMaxMod    = 50000 -- Maximum module for power and lever
-local gnMaxMass   = 50000 -- The maximum mass the entity can have
-local gnMaxRadius = 1000  -- Maximum radius when rebuilding the collision model as sphere
-local gnTimerCL   = 250   -- Interval to broadcast server data to the client looking ( milliseconds )
+local gsSentHash = "sent_spinner"
+local gsSentName = gsSentHash:gsub("sent_","")
+local gnVarFlags = bit.bor(FCVAR_ARCHIVE, FCVAR_ARCHIVE_XBOX, FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_PRINTABLEONLY)
+local varMaxScale  = CreateConVar("sbox_max"..gsSentName.."_scale" , 50000, gnVarFlags, "Maximum scale for power and lever")
+local varMaxMass   = CreateConVar("sbox_max"..gsSentName.."_mass"  , 50000, gnVarFlags, "The maximum mass the entity can have")
+local varMaxRadius = CreateConVar("sbox_max"..gsSentName.."_radius", 1000, gnVarFlags, "Maximum radius when rebuilding the collision model as sphere")
+local varBroadCast = CreateConVar("sbox_max"..gsSentName.."_broad" , 300, gnVarFlags, "Maximum time when reached the think method sends stuff to client")
+local varTickRate  = CreateConVar("sbox_max"..gsSentName.."_tick" , 5, gnVarFlags, "Maximum sampling time when the spinner is activated. Be careful!")
 
 ENT.Type            = "anim"
 if (WireLib) then
   ENT.Base          = "base_wire_entity"
-  ENT.WireDebugName = gsSentHash:gsub("sent_",""):gsub("^%l",string.upper)
+  ENT.WireDebugName = gsSentName:gsub("^%l",string.upper)
 else
   ENT.Base          = "base_gmodentity"
 end
-ENT.PrintName       = gsSentHash:gsub("sent_",""):gsub("^%l",string.upper)
+ENT.PrintName       = gsSentName:gsub("^%l",string.upper)
 ENT.Author          = "DVD"
 ENT.Contact         = "dvd_video@abv.bg"
 ENT.Editable        = true
@@ -79,7 +82,13 @@ if(SERVER) then
     oSent.Radi = 0        -- Collision radius
     oSent.DAng = 0        -- Store the angle delta to avoid calculating it every frame on SV
     oSent.Tick = 5        -- Entity ticking interval ( milliseconds )
-    oSent.TSnd = 0        -- Threshold time to sending the date to the client to view in DrawHUD
+    oSent.Rate = {}       -- This holds the time rates for the entity
+    oSent.Rate[1] = varTickRate:GetFloat()  -- Entity tick rate [ms]
+    oSent.Rate[2] = varBroadCast:GetFloat() -- Client broadcast interval [ms]
+    oSent.Rate[3] = 0                       -- Start system time [s]
+    oSent.Rate[4] = 0                       -- Time execution delta [ms]
+    oSent.Rate[5] = 0                       -- Time delta sum for broadcasting [ms]
+    oSent.Rate[6] = 0                       -- Benchmarking duty cycle [] (0-100)%
     oSent.On   = false    -- Enable/disable working
     oSent.Togg = false    -- Toggle the spinner
     oSent.LAng = Angle()  -- Temporary angle server-side used for rotation
@@ -109,7 +118,7 @@ if(SERVER) then
       WireLib.CreateSpecialOutputs(self,{
         "RPM" ,
         "Tick",
-        "Margin",
+        "Duty",
         "Axis"
       }, { "NORMAL", "NORMAL", "NORMAL", "VECTOR"}, {
         " Revolutions per minute ",
@@ -127,7 +136,7 @@ if(SERVER) then
     vRes:Set(vVec); vRes:Mul(nNum); vRes:Add(vPos); return vRes end
 
   function ENT:SetPhysRadius(nRad)
-    local nRad = math.Clamp(tonumber(nRad) or 0, 0, gnMaxRadius)
+    local nRad = math.Clamp(tonumber(nRad) or 0, 0, varMaxRadius:GetFloat())
     if(nRad > 0) then
       local oSent = self[gsSentHash]
       local vMin  = Vector(-nRad,-nRad,-nRad)
@@ -140,13 +149,13 @@ if(SERVER) then
 
   function ENT:SetPower(nPow)
     local oSent = self[gsSentHash] -- Magnitude of the spinning force
-    oSent.Power = math.Clamp((tonumber(nPow) or 0), -gnMaxMod, gnMaxMod)
+    oSent.Power = math.Clamp((tonumber(nPow) or 0), -varMaxScale:GetFloat(), varMaxScale:GetFloat())
     self:SetNWFloat(gsSentHash.."_power", oSent.Power); return true
   end
 
   function ENT:SetLever(nLev)
     local oSent = self[gsSentHash] -- Magnitude of the spinning force
-    oSent.Lever = math.Clamp((tonumber(nLev) or 0), 0, gnMaxMod)
+    oSent.Lever = math.Clamp((tonumber(nLev) or 0), 0, varMaxScale:GetFloat())
     if(oSent.Lever == 0) then -- Use the half of the bounding box size
       vMin, vMax = self:OBBMins(), self:OBBMaxs()
       oSent.Lever = ((vMax - vMin):Length()) / 2
@@ -157,7 +166,7 @@ if(SERVER) then
   function ENT:SetTorqueAxis(vDir)
     local oSent = self[gsSentHash]
     if(vDir:Length() == 0) then
-      ErrorNoHalt("ENT.SetTorqueAxis: Spin axis invalid\n"); self:Remove(); return false end
+      ErrorNoHalt("ENT.SetTorqueAxis: Spinner axis invalid\n"); self:Remove(); return false end
     oSent.AxiL:Set(vDir); oSent.AxiL:Normalize()
     self:SetNWVector(gsSentHash.."_adir",oSent.AxiL); return true
   end
@@ -166,9 +175,9 @@ if(SERVER) then
     local oSent = self[gsSentHash]
     local nCnt  = (tonumber(nCnt) or 0)
     if(nCnt <= 0) then
-      ErrorNoHalt("ENT.SetTorqueLever: Lever count invalid\n"); self:Remove(); return false end
+      ErrorNoHalt("ENT.SetTorqueLever: Spinner lever count invalid\n"); self:Remove(); return false end
     if(vDir:Length() == 0) then
-      ErrorNoHalt("ENT.SetTorqueLever: Force lever invalid\n"); self:Remove(); return false end
+      ErrorNoHalt("ENT.SetTorqueLever: Spinner force lever invalid\n"); self:Remove(); return false end
     oSent.CLev = nCnt
     oSent.DAng = (360 / nCnt)
     oSent.LevL:Set(vDir) -- Lever direction matched to player right
@@ -194,12 +203,12 @@ if(SERVER) then
       self:SetLever(stSpinner.Lever)           -- Leverage length
       self:SetNWVector(gsSentHash.."_cen", oPhys:GetMassCenter())
       local oSent = self[gsSentHash]
-      local nMass = math.Clamp(tonumber(stSpinner.Mass) or 1, 1, gnMaxMass)
+      local nMass = math.Clamp(tonumber(stSpinner.Mass) or 1, 1, varMaxMass:GetFloat())
       oPhys:SetMass(nMass); oSent.Mass = nMass -- Mass
       oSent.Prop = stSpinner.Prop              -- Model
       oSent.KeyF = stSpinner.KeyF              -- Forward spin key ( positive power )
       oSent.KeyR = stSpinner.KeyR              -- Forward spin key ( negative power )
-    else ErrorNoHalt("ENT.Setup: Physics invalid\n"); self:Remove(); return false end
+    else ErrorNoHalt("ENT.Setup: Spinner physics invalid\n"); self:Remove(); return false end
     collectgarbage(); return true -- Everything is fine !
   end
 
@@ -220,14 +229,41 @@ if(SERVER) then
     WireLib.TriggerOutput(self, sOut, anyVal)
   end
 
+  function ENT:TimeTic()
+    local goTime  = SysTime(); oSent.Rate[3] = goTime -- Start time in seconds
+    local toTime  = (oSent.Rate[1] / 1000) -- Sampling time in milliseconds
+    self:NextThink(goTime + toTime) -- Add apples to apples. Thanks Applejack !
+    return self -- Make sure it us enable to cascade it in real-time
+  end
+
+  function ENT:TimeToc()
+    local goTime = oSent.Rate[3] -- Start time [s]
+    local toTime = oSent.Rate[1] -- Entity tick rate [ms]
+    local dtTime = (1000 * (SysTime() - goTime)); oSent.Rate[4] = dtTime
+    if(dtTime > toTime) then
+      ErrorNoHalt("ENT.Think: Spinner out of time margin\n"); self:Remove(); end
+    oSent.Rate[6] = ((dtTime / toTime) * 100) -- Benchmarking duty cycle
+    return self -- Make sure it us enable to cascade it in real-time
+  end
+
+  function ENT:TimeNetwork(...)
+    local snTime = oSent.Rate[5] -- Current time internal [ms]
+    local bcTime = oSent.Rate[2] -- Broadcast interval [ms]
+    local dtTime = oSent.Rate[4] -- Time delta for this iteration [ms]
+    if(snTime >= bcTime) then
+      local val = unpack(...) -- Values stack for networking
+      self:SetNWFloat(gsSentHash.."_power", val[1])
+      self:SetNWFloat(gsSentHash.."_lever", val[2])
+      oSent.Rate[5] = 0 -- Register that we are at the beginning and waiting for another event
+    else snTime = snTime + dtTime; oSent.Rate[5] = snTime end
+    return self -- Make sure it us enable to cascade it in real-time
+  end
+
   function ENT:Think()
-    local goTime = SysTime()
-    local toTime = oSent.Tick -- Sampling time in milliseconds
-    self:NextThink(goTime + (toTime / 1000)) -- Add seconds to seconds
     local oPhys = self:GetPhysicsObject()
-    if(oPhys and oPhys:IsValid()) then
-      local oSent = self[gsSentHash]
-      local vCn, wFr = self:LocalToWorld(oPhys:GetMassCenter())
+    if(oPhys and oPhys:IsValid()) then self:TimeTic()
+      local oSent, Pw, Le, wFr = self[gsSentHash], 0, 0, nil
+      local vCn = self:LocalToWorld(oPhys:GetMassCenter())
       if(WireLib) then wFr = self:ReadWire("Force")
         local wOn = self:ReadWire("On")
         local wPw = self:ReadWire("Power")
@@ -237,9 +273,9 @@ if(SERVER) then
         if(wPw ~= nil) then oSent.Power, oSent.Dir = wPw, 1 end
       end -- Do not change internal setting with a peak when wire is disconnected
       if(oSent.On) then -- Disable toggling via numpad if wire is connected
-        local vPwt, vLvt = oSent.PowT, oSent.LevT
+        local vPwt, vLvt, eAng = oSent.PowT, oSent.LevT, self:GetAngles()
         local vLew, vAxw, aLev = oSent.LevW, oSent.AxiW, oSent.LAng
-        local Le, Pw, eA = oSent.Lever, (oSent.Power * oSent.Dir), self:GetAngles()
+        Le, Pw = oSent.Lever, (oSent.Power * oSent.Dir)
         vAxw:Set(oSent.AxiL); vAxw:Rotate(eA)
         vLew:Set(oSent.LevL); vLew:Rotate(eA)
         aLev:Set(vLew:AngleEx(vAxw))
@@ -252,54 +288,34 @@ if(SERVER) then
           if(wFr and wFr:Length() > 0) then oPhys:ApplyForceCenter(wFr) end
           self:WriteWire("Axis", vAxw)
         end
-        local dtTime = (1000 * (SysTime() - goTime)) -- ( Seconds to milliseconds )
-        if(oSent.TSnd >= gnTimerCL) then
-          self:SetNWFloat(gsSentHash.."_power", Pw)
-          self:SetNWFloat(gsSentHash.."_lever", Le)
-          oSent.TSnd = 0
-        else oSent.TSnd = oSent.TSnd + dtTime end
-        if(dtTime > toTime) then
-          ErrorNoHalt("ENT.Think: Spinner out of time margin\n"); self:Remove(); end
       end
       if(WireLib) then
-        self:WriteWire("Tick", dtTime)
-        self:WriteWire("Margin", ((dtTime / toTime) * 100))
-        self:WriteWire("RPM" , oPhys:GetAngleVelocity():Dot(oSent.AxiL) / 6) end
-    else ErrorNoHalt("ENT.Think: Physics invalid\n"); self:Remove(); end; return true
+        self:WriteWire("RPM", oPhys:GetAngleVelocity():Dot(oSent.AxiL) / 6) end
+      self:TimeToc():TimeNetwork(Pw, Le)
+    else ErrorNoHalt("ENT.Think: Spinner physics invalid\n"); self:Remove(); end; return true
   end
 
   local function spinForward(oPly, oEnt)
     if(not (oEnt and oEnt:IsValid())) then return end
     if(not (oEnt:GetClass() == gsSentHash)) then return end
     local Data = oEnt[gsSentHash]
-    if(Data.On and oEnt:IsToggled()) then
-      Data.On = false
-    else
-      Data.Dir = 1
-      Data.On  = true
-    end
+    if(Data.On and oEnt:IsToggled()) then Data.On = false
+    else Data.Dir, Data.On = 1, true end
   end
 
   local function spinReverse(oPly, oEnt)
     if(not (oEnt and oEnt:IsValid())) then return end
     if(not (oEnt:GetClass() == gsSentHash)) then return end
     local Data = oEnt[gsSentHash]
-    if(Data.On and oEnt:IsToggled()) then
-      Data.On = false
-    else
-      Data.Dir = -1
-      Data.On  = true
-    end
+    if(Data.On and oEnt:IsToggled()) then Data.On = false
+    else Data.Dir, Data.On = -1, true end
   end
 
   local function spinStop(oPly, oEnt)
     if(not (oEnt and oEnt:IsValid())) then return end
     if(not (oEnt:GetClass() == gsSentHash)) then return end
-    if(not oEnt:IsToggled()) then
-      local Data = oEnt[gsSentHash]
-      Data.Dir = 0
-      Data.On  = false
-    end
+    local Data = oEnt[gsSentHash]
+    if(not oEnt:IsToggled()) then Data.Dir, Data.On = 0, false end
   end
 
   numpad.Register(gsSentHash.."_spinForward_On" , spinForward)
