@@ -280,7 +280,7 @@ if(SERVER) then
     if(not tmRate.isRdy) then tmRate.isRdy = true end
   end
 
-  function ENT:TimeNetwork(...)
+  function ENT:BroadCast(...)
     local tmRate = self[gsSentHash].Rate
     if(tmRate.bcTim <= 0) then
       local val = {...} -- Values stack for networking
@@ -291,7 +291,7 @@ if(SERVER) then
   end
 
   function ENT:Think()
-    self:TimeTic()
+    self:Tic()
     local oSent = self[gsSentHash]
     local oPhys, Pw, Le = self:GetPhysicsObject(), 0, 0
     if(oPhys and oPhys:IsValid()) then
@@ -325,7 +325,7 @@ if(SERVER) then
         self:WriteWire("RPM", oPhys:GetAngleVelocity():Dot(oSent.AxiL) / 6) end
     else ErrorNoHalt("ENT.Think: Spinner physics invalid\n"); self:Remove(); end
     if(WireLib) then self:WriteWire("Rate", self:GetRateMap()) end
-    self:TimeToc(); self:TimeNetwork(Pw, Le); return true
+    self:Toc(); self:BroadCast(Pw, Le); return true
   end
 
   local function spinForward(oPly, oEnt)
