@@ -195,7 +195,7 @@ if(SERVER) then
   function ENT:SetTorqueAxis(vDir)
     local oSent = self[gsSentHash]
     if(vDir:Length() == 0) then
-      ErrorNoHalt("ENT.SetTorqueAxis: Spinner axis invalid\n"); self:Remove(); return false end
+      ErrorNoHalt("ENT.SetTorqueAxis: Axis invalid\n"); self:Remove(); return false end
     oSent.AxiL:Set(vDir); oSent.AxiL:Normalize()
     self:SetNWVector(gsSentHash.."_adir",oSent.AxiL); return true
   end
@@ -204,9 +204,9 @@ if(SERVER) then
     local oSent = self[gsSentHash]
     local nCnt  = (tonumber(nCnt) or 0)
     if(nCnt <= 0) then
-      ErrorNoHalt("ENT.SetTorqueLever: Spinner lever count invalid\n"); self:Remove(); return false end
+      ErrorNoHalt("ENT.SetTorqueLever: Lever count invalid\n"); self:Remove(); return false end
     if(vDir:Length() == 0) then
-      ErrorNoHalt("ENT.SetTorqueLever: Spinner force lever invalid\n"); self:Remove(); return false end
+      ErrorNoHalt("ENT.SetTorqueLever: Force lever invalid\n"); self:Remove(); return false end
     oSent.CLev = nCnt
     oSent.DAng = (360 / nCnt)
     oSent.LevL:Set(vDir) -- Lever direction matched to player right
@@ -237,7 +237,7 @@ if(SERVER) then
       oSent.Prop = stSpinner.Prop              -- Model
       oSent.KeyF = stSpinner.KeyF              -- Forward spin key ( positive power )
       oSent.KeyR = stSpinner.KeyR              -- Forward spin key ( negative power )
-    else ErrorNoHalt("ENT.Setup: Spinner physics invalid\n"); self:Remove(); return false end
+    else ErrorNoHalt("ENT.Setup: Physics invalid\n"); self:Remove(); return false end
     collectgarbage(); return true -- Everything is fine !
   end
 
@@ -323,7 +323,7 @@ if(SERVER) then
       end
       if(WireLib) then
         self:WriteWire("RPM", oPhys:GetAngleVelocity():Dot(oSent.AxiL) / 6) end
-    else ErrorNoHalt("ENT.Think: Spinner physics invalid\n"); self:Remove(); end
+    else ErrorNoHalt("ENT.Think: Physics invalid\n"); self:Remove(); end
     if(WireLib) then self:WriteWire("Rate", self:GetRateMap()) end
     self:Toc(); self:BroadCast(Pw, Le); return true
   end
