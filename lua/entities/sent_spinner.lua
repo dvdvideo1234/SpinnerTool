@@ -78,21 +78,46 @@ end
 
 if(SERVER) then
 
+  local tRateMap = {
+    [1]  = "bcTot",
+    [2]  = "bcTim",
+    [3]  = "eTick",
+    [4]  = "thStO",
+    [5]  = "thStN",
+    [6]  = "thEnd",
+    [7]  = "thTim",
+    [8]  = "thEvt",
+    [9]  = "thDet"
+  }
+  --[[
+   * User sets the desired times in [ms] and the entity converts them to seconds
+   * As it handles the times divides all input times by 1000 to convert [ms] to [s]
+  ]]--
+  function ENT:GetRateMap()
+    local tmRate = self[gsSentHash].Rate
+    local mpTime = tmRate.mpTim
+    for ID = 1, #tRateMap do mpTime[ID] = tmRate[tRateMap[ID]] end
+    return mpTime
+  end
+
   function ENT:Initialize()
     self[gsSentHash] = {}; local oSent = self[gsSentHash]
     oSent.Dir  = 0        -- Power sign for reverse support
     oSent.CLev = 0        -- How many spinner levers do we have (allocate)
     oSent.Radi = 0        -- Collision radius
     oSent.DAng = 0        -- Store the angle delta to avoid calculating it every frame on SV
-    oSent.Tick = 5        -- Entity ticking interval ( milliseconds )
     oSent.Rate = {}       -- This holds the time rates for the entity
-    oSent.Rate[1] = varTickRate:GetFloat()  -- Entity tick rate [ms]
-    oSent.Rate[2] = varBroadCast:GetFloat() -- Client broadcast interval [ms]
-    oSent.Rate[3] = 0                       -- Start system time [s]
-    oSent.Rate[4] = 0                       -- Time execution delta [ms]
-    oSent.Rate[5] = 0                       -- Time delta sum for broadcasting [ms]
-    oSent.Rate[6] = 0                       -- The actual time reached for broadcasting [ms]
-    oSent.Rate[7] = 0                       -- Duty cycle (0-100)% of tick rate used for calculations []
+    oSent.Rate.bcTot = (varBroadCast:GetFloat() / 1000) -- Broadcast time sever-clients [ms] to [s]
+    oSent.Rate.bcTim = (varBroadCast:GetFloat() / 1000) -- Broadcast compare value      [ms] to [s]
+    oSent.Rate.eTick = (varTickRate:GetFloat()  / 1000) -- Entity ticking interval      [ms] to [s]
+    oSent.Rate.thStO = 0 -- The time between each tick start (OLD) [s]
+    oSent.Rate.thStN = 0 -- The time between each tick start (NEW) [s]
+    oSent.Rate.thEnd = 0 -- The time when a tick exactly ends. Algorithm completion [s]
+    oSent.Rate.thTim = 0 -- How much time does the think stuff requite (thEnd - thStO).
+    oSent.Rate.thEvt = 0 -- How much time does the think event requite (thStN - thStO).
+    oSent.Rate.thDet = 0 -- Tick duty cycle (thTim / thEvt * 100).
+    oSent.Rate.isRdy = false -- Initialization flag. Dropped on the second think
+    oSent.Rate.mpTim = {}
     oSent.On   = false    -- Enable/disable working
     oSent.Togg = false    -- Toggle the spinner
     oSent.LAng = Angle()  -- Temporary angle server-side used for rotation
@@ -130,6 +155,8 @@ if(SERVER) then
       })
     end; return true
   end
+
+
 
   local function getPower(vRes, vVec, nNum)
     vRes:Set(vVec); vRes:Mul(nNum); return vRes end
@@ -231,35 +258,35 @@ if(SERVER) then
     WireLib.TriggerOutput(self, sOut, anyVal); return self
   end
 
-  function ENT:TimeTic()
-    local tmRate  = self[gsSentHash].Rate
-    local nxTime  = (tmRate[1] / 1000) -- Entity sampling time [s]
-    self:NextThink(curNow() + nxTime) -- Add apples to apples. Thanks Applejack !
-    local goTime  = sysNow(); tmRate[3] = goTime -- Start time [s]
+  function self:Tic()
+    local oSent = self[gsSentHash]
+    local tmRate = oSent.Rate
+    self:NextThink(curNow() + tmRate.eTick) -- Prepare the next think [s]
+    tmRate.thStO = tmRate.thStN     -- The tick start time gets older [s]
+    tmRate.thStN = getNow()         -- Read the new think start time [s]
+    if(tmRate.isRdy) then
+      tmRate.thEvt = (tmRate.thStN - tmRate.thStO) -- Think event delta [s]
+      tmRate.thTim = (tmRate.thEnd - tmRate.thStO) -- Think hook delta [s]
+      tmRate.thDet = (tmRate.thTim / tmRate.thEvt) * 100 -- Think duty margin []
+      if(tmRate.thTim >= tmRate.thEvt) then self:Remove()
+        ErrorNoHalt("ENT.Tic: Duty margin fail ["..tostring(tmRate.thDet).."%]\n") end
+      tmRate.bcTim = tmRate.bcTim - tmRate.thEvt         -- Update broadcast time [s]
+    end
   end
 
-  function ENT:TimeToc()
+  function self:Toc()
     local tmRate = self[gsSentHash].Rate
-    local toTime = tmRate[1] -- Entity tick rate [ms]
-    local goTime = tmRate[3] -- Start time [s]
-    local snTime = tmRate[5] -- Current time internal for broadcast [ms]
-    local dtTime = (1000 * (sysNow() - goTime)); tmRate[4] = dtTime -- Time execution delta [ms]   
-    if(dtTime > toTime) then
-      ErrorNoHalt("ENT.Think: Spinner out of time margin\n"); self:Remove(); end
-    tmRate[7] = ((dtTime / toTime) * 100) -- Benchmarking duty cycle
-    snTime = snTime + dtTime; tmRate[5] = snTime
+    tmRate.thEnd = getNow()
+    if(not tmRate.isRdy) then tmRate.isRdy = true end
   end
 
   function ENT:TimeNetwork(...)
     local tmRate = self[gsSentHash].Rate
-    local bcTime = tmRate[2] -- Broadcast interval [ms]
-    local snTime = tmRate[5] -- Current time internal for broadcast [ms]
-    if(snTime >= bcTime) then
+    if(tmRate.bcTim <= 0) then
       local val = {...} -- Values stack for networking
       self:SetNWFloat(gsSentHash.."_power", val[1])
       self:SetNWFloat(gsSentHash.."_lever", val[2])
-      tmRate[5] = 0      -- Register that we are at the beginning and waiting for another event
-      tmRate[6] = snTime -- How much time is actually matched to the interval chosen
+      tmRate.bcTim = tmRate.bcTot
     end
   end
 
@@ -297,7 +324,7 @@ if(SERVER) then
       if(WireLib) then
         self:WriteWire("RPM", oPhys:GetAngleVelocity():Dot(oSent.AxiL) / 6) end
     else ErrorNoHalt("ENT.Think: Spinner physics invalid\n"); self:Remove(); end
-    if(WireLib) then self:WriteWire("Rate", oSent.Rate) end
+    if(WireLib) then self:WriteWire("Rate", self:GetRateMap()) end
     self:TimeToc(); self:TimeNetwork(Pw, Le); return true
   end
 
