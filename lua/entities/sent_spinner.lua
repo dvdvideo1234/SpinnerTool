@@ -80,7 +80,12 @@ function ENT:IsToggled()
 end
 
 if(SERVER) then
-
+  -- Represents the arguments of ENT:BroadCast()
+  local tBroadCast = {
+    [1] = {"SetNWFloat", gsSentHash.."_power", 0},
+    [2] = {"SetNWFloat", gsSentHash.."_lever", 0}
+  }
+  -- Used for rate array output
   local tRateMap = {
     [1]  = "bcTot",
     [2]  = "bcTim",
@@ -99,7 +104,10 @@ if(SERVER) then
   function ENT:GetRateMap()
     local tmRate = self[gsSentHash].Rate
     local mpTime = tmRate.mpTim
-    for ID = 1, #tRateMap do mpTime[ID] = tmRate[tRateMap[ID]] end
+    for ID = 1, #tRateMap do
+      local key = tRateMap[ID]
+      mpTime[ID] = tmRate[key]
+    end
     return mpTime
   end
 
@@ -296,10 +304,13 @@ if(SERVER) then
   function ENT:BroadCast(...)
     local tmRate = self[gsSentHash].Rate
     if(tmRate.bcTim <= 0) then
-      local val = {...} -- Values stack for networking
-      self:SetNWFloat(gsSentHash.."_power", val[1])
-      self:SetNWFloat(gsSentHash.."_lever", val[2])
-      tmRate.bcTim = tmRate.bcTot
+      local arList = {...}               -- Values stack for networking
+      for ID = 1, #tBroadCast do         -- Go trough all like a list
+        local set = tBroadCast[ID]       -- Get broadcaster setup
+        local val = arList[ID] or set[3] -- Take current or default when empty
+        local foo, key = set[1], set[2]  -- Get the broadcast pair values
+        self[foo](self, key, val)        -- Send to the client the value given
+      end; tmRate.bcTim = tmRate.bcTot
     end
   end
 
@@ -338,7 +349,8 @@ if(SERVER) then
       if(WireLib) then
         self:WriteWire("RPM", oPhys:GetAngleVelocity():Dot(oSent.AxiL) / 6) end
     else self:SetError("ENT.Think: Physics invalid"); end
-    if(WireLib and oSent.IsTDB) then self:WriteWire("Rate", self:GetRateMap()) end
+    if(WireLib and oSent.IsTDB) then
+      self:WriteWire("Rate", self:GetRateMap()) end
     self:Toc(); self:BroadCast(Pw, Le); return true
   end
 
