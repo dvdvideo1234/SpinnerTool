@@ -334,7 +334,6 @@ if(SERVER) then
               wPw = self:ReadWire("Power")
               wLe = self:ReadWire("Lever")
               wFr = self:ReadWire("Force")
-        print("W", wOn, wPw, wLe)
         if(wOn ~= nil) then oSent.On = (wOn ~= 0) end -- On connected toggle with wire
       end -- Remember internal settings for lever and power when wire is disconnected
       if(oSent.On) then -- Disable toggling via numpad if wire is connected
@@ -342,8 +341,6 @@ if(SERVER) then
         local vLew, vAxw, aLev = oSent.LevW, oSent.AxiW, oSent.LAng
         Le = (wLe and wLe or  oSent.Lever) -- Do not wipe internals in disconnect
         Pw = (wPw and wPw or (oSent.Power * oSent.Dir))
-        print("GO", Pw, Le)
-        print("HY", oSent.Power, oSent.Dir)
         vAxw:Set(oSent.AxiL); vAxw:Rotate(eAng)
         vLew:Set(oSent.LevL); vLew:Rotate(eAng)
         aLev:Set(vLew:AngleEx(vAxw))
