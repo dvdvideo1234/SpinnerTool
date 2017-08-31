@@ -21,6 +21,9 @@ local varMaxMass   = GetConVar("sbox_max"..gsSentName.."_mass")
 local varMaxRadius = GetConVar("sbox_max"..gsSentName.."_radius")
 local varBroadCast = GetConVar("sbox_max"..gsSentName.."_broad")
 local varTickRate  = GetConVar("sbox_max"..gsSentName.."_tick")
+local varRemoveER  = GetConVar("sbox_en" ..gsSentName.."_remerr")
+local varEnableWT  = GetConVar("sbox_en" ..gsSentName.."_wdterr")
+local varEnableDT  = GetConVar("sbox_en" ..gsSentName.."_timdbg")
 
 ENT.Type            = "anim"
 if (WireLib) then
@@ -100,6 +103,13 @@ if(SERVER) then
     return mpTime
   end
 
+  function ENT:SetError(sMsg)
+    local oSent  = self[gsSentHash]
+    local idSent = ": ["..self:EntIndex().."]["..gsSentHash.."]"
+    ErrorNoHalt(idSent..tostring(sMsg or "N/A"))
+    if(oSent.IsERM) then self:Remove() end
+  end
+
   function ENT:Initialize()
     self[gsSentHash] = {}; local oSent = self[gsSentHash]
     oSent.Dir  = 0        -- Power sign for reverse support
@@ -113,11 +123,14 @@ if(SERVER) then
     oSent.Rate.thStO = 0 -- The time between each tick start (OLD) [s]
     oSent.Rate.thStN = 0 -- The time between each tick start (NEW) [s]
     oSent.Rate.thEnd = 0 -- The time when a tick exactly ends. Algorithm completion [s]
-    oSent.Rate.thTim = 0 -- How much time does the think stuff requite (thEnd - thStO).
-    oSent.Rate.thEvt = 0 -- How much time does the think event requite (thStN - thStO).
-    oSent.Rate.thDet = 0 -- Tick duty cycle (thTim / thEvt * 100).
+    oSent.Rate.thTim = 0 -- How much time does the think stuff requite (thEnd - thStO) [s]
+    oSent.Rate.thEvt = 0 -- How much time does the think event requite (thStN - thStO) [s]
+    oSent.Rate.thDet = 0 -- Tick duty cycle (thTim / thEvt * 100) []
     oSent.Rate.isRdy = false -- Initialization flag. Dropped on the second think
-    oSent.Rate.mpTim = {}
+    oSent.Rate.isWDT = varEnableWT:GetBool() -- Translate SENT watchdog to an error
+    oSent.Rate.mpTim = {} -- Here the debugging times are stored
+    oSent.IsERM = varRemoveER:GetBool() -- Whenever to remove the entity on error
+    oSent.IsTDB = varEnableDT:GetBool() -- Enables the tick rate system array output
     oSent.On   = false    -- Enable/disable working
     oSent.Togg = false    -- Toggle the spinner
     oSent.LAng = Angle()  -- Temporary angle server-side used for rotation
@@ -147,11 +160,11 @@ if(SERVER) then
       WireLib.CreateSpecialOutputs(self,{
         "RPM" ,
         "Axis",
-        "Rate"
-      }, { "NORMAL", "VECTOR", "ARRAY"}, {
+        (oSent.IsTDB and "Rate" or nil)
+      }, { "NORMAL", "VECTOR", (oSent.IsTDB and "ARRAY" or nil)}, {
         " Revolutions per minute ",
         " Spinner rotation axis ",
-        " Benchmark times and events "
+        (oSent.IsTDB and " Benchmark times and events " or nil)
       })
     end; return true
   end
@@ -195,7 +208,7 @@ if(SERVER) then
   function ENT:SetTorqueAxis(vDir)
     local oSent = self[gsSentHash]
     if(vDir:Length() == 0) then
-      ErrorNoHalt("ENT.SetTorqueAxis: Axis invalid\n"); self:Remove(); return false end
+      self:SetError("ENT.SetTorqueAxis: Axis invalid"); return false end
     oSent.AxiL:Set(vDir); oSent.AxiL:Normalize()
     self:SetNWVector(gsSentHash.."_adir",oSent.AxiL); return true
   end
@@ -204,9 +217,9 @@ if(SERVER) then
     local oSent = self[gsSentHash]
     local nCnt  = (tonumber(nCnt) or 0)
     if(nCnt <= 0) then
-      ErrorNoHalt("ENT.SetTorqueLever: Lever count invalid\n"); self:Remove(); return false end
+      self:SetError("ENT.SetTorqueLever: Lever count invalid"); return false end
     if(vDir:Length() == 0) then
-      ErrorNoHalt("ENT.SetTorqueLever: Force lever invalid\n"); self:Remove(); return false end
+      self:SetError("ENT.SetTorqueLever: Force lever invalid"); return false end
     oSent.CLev = nCnt
     oSent.DAng = (360 / nCnt)
     oSent.LevL:Set(vDir) -- Lever direction matched to player right
@@ -237,7 +250,7 @@ if(SERVER) then
       oSent.Prop = stSpinner.Prop              -- Model
       oSent.KeyF = stSpinner.KeyF              -- Forward spin key ( positive power )
       oSent.KeyR = stSpinner.KeyR              -- Forward spin key ( negative power )
-    else ErrorNoHalt("ENT.Setup: Physics invalid\n"); self:Remove(); return false end
+    else self:SetError("ENT.Setup: Physics invalid"); return false end
     collectgarbage(); return true -- Everything is fine !
   end
 
@@ -264,12 +277,12 @@ if(SERVER) then
     self:NextThink(curNow() + tmRate.eTick) -- Prepare the next think [s]
     tmRate.thStO = tmRate.thStN     -- The tick start time gets older [s]
     tmRate.thStN = getNow()         -- Read the new think start time [s]
-    if(tmRate.isRdy) then
+    if(tmRate.isRdy) then           -- When rate structure is initialized
       tmRate.thEvt = (tmRate.thStN - tmRate.thStO) -- Think event delta [s]
       tmRate.thTim = (tmRate.thEnd - tmRate.thStO) -- Think hook delta [s]
       tmRate.thDet = (tmRate.thTim / tmRate.thEvt) * 100 -- Think duty margin []
-      if(tmRate.thTim >= tmRate.thEvt) then self:Remove()
-        ErrorNoHalt("ENT.Tic: Duty margin fail ["..tostring(tmRate.thDet).."%]\n") end
+      if(tmRate.thTim >= tmRate.thEvt and tmRate.isWDT) then -- Watchdog error
+        self:SetError("ENT.Tic: Duty margin fail ["..tostring(tmRate.thDet).."%]") end
       tmRate.bcTim = tmRate.bcTim - tmRate.thEvt         -- Update broadcast time [s]
     end
   end
@@ -295,19 +308,20 @@ if(SERVER) then
     local oSent = self[gsSentHash]
     local oPhys, Pw, Le = self:GetPhysicsObject(), 0, 0
     if(oPhys and oPhys:IsValid()) then
-      local vCn, wFr = self:LocalToWorld(oPhys:GetMassCenter()), nil
-      if(WireLib) then wFr = self:ReadWire("Force")
+      local vCn = self:LocalToWorld(oPhys:GetMassCenter())
+      local wFr, wLe, wPw
+      if(WireLib) then
         local wOn = self:ReadWire("On")
-        local wPw = self:ReadWire("Power")
-        local wLe = self:ReadWire("Lever")
-        if(wLe ~= nil) then oSent.Lever = wLe end
-        if(wOn ~= nil) then oSent.On = (wOn ~= 0) end
-        if(wPw ~= nil) then oSent.Power, oSent.Dir = wPw, 1 end
-      end -- Do not change internal setting with a peak when wire is disconnected
+              wPw = self:ReadWire("Power")
+              wLe = self:ReadWire("Lever")
+              wFr = self:ReadWire("Force")
+        if(wOn ~= nil) then oSent.On = (wOn ~= 0) end -- On connected toggle with wire
+      end -- Remember internal settings for lever and power when wire is disconnected
       if(oSent.On) then -- Disable toggling via numpad if wire is connected
         local vPwt, vLvt, eAng = oSent.PowT, oSent.LevT, self:GetAngles()
         local vLew, vAxw, aLev = oSent.LevW, oSent.AxiW, oSent.LAng
-        Le, Pw = oSent.Lever, (oSent.Power * oSent.Dir)
+        Le = ((wLe ~= nil) and wLe or oSent.Lever) -- Do not wipe internals in disconnect
+        Pw = ((wPw ~= nil) and wPw or (oSent.Power * oSent.Dir))
         vAxw:Set(oSent.AxiL); vAxw:Rotate(eAng)
         vLew:Set(oSent.LevL); vLew:Rotate(eAng)
         aLev:Set(vLew:AngleEx(vAxw))
@@ -323,8 +337,8 @@ if(SERVER) then
       end
       if(WireLib) then
         self:WriteWire("RPM", oPhys:GetAngleVelocity():Dot(oSent.AxiL) / 6) end
-    else ErrorNoHalt("ENT.Think: Physics invalid\n"); self:Remove(); end
-    if(WireLib) then self:WriteWire("Rate", self:GetRateMap()) end
+    else self:SetError("ENT.Think: Physics invalid"); end
+    if(WireLib and oSent.IsTDB) then self:WriteWire("Rate", self:GetRateMap()) end
     self:Toc(); self:BroadCast(Pw, Le); return true
   end
 
@@ -357,5 +371,3 @@ if(SERVER) then
   numpad.Register(gsSentHash.."_spinReverse_Off", spinStop)
 
 end
-
-

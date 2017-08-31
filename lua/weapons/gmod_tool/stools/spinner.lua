@@ -16,7 +16,10 @@ local varMaxScale  = CreateConVar("sbox_max"..gsSentName.."_scale" , 50000, gnVa
 local varMaxMass   = CreateConVar("sbox_max"..gsSentName.."_mass"  , 50000, gnVarFlags, "The maximum mass the entity can have")
 local varMaxRadius = CreateConVar("sbox_max"..gsSentName.."_radius", 1000, gnVarFlags, "Maximum radius when rebuilding the collision model as sphere")
 local varBroadCast = CreateConVar("sbox_max"..gsSentName.."_broad" , 300, gnVarFlags, "Maximum time [ms] when reached the think method sends client stuff")
-local varTickRate  = CreateConVar("sbox_max"..gsSentName.."_tick" , 5, gnVarFlags, "Maximum sampling time [ms] when the spinner is activated. Be careful!")
+local varTickRate  = CreateConVar("sbox_max"..gsSentName.."_tick"  , 5, gnVarFlags, "Maximum sampling time [ms] when the spinner is activated. Be careful!")
+local varRemoveER  = CreateConVar("sbox_en" ..gsSentName.."_remerr", 1, gnVarFlags, "When enabled removes the spinner when an error is present")
+local varEnableWT  = CreateConVar("sbox_en" ..gsSentName.."_wdterr", 1, gnVarFlags, "When enabled takes the watchdog timer for an actual error")
+local varEnableDT  = CreateConVar("sbox_en" ..gsSentName.."_timdbg", 1, gnVarFlags, "When enabled outputs the rate status on the wire output")
 
 local gnRatio      = 1.61803398875
 local gsToolName   = gsSentName
@@ -602,9 +605,4 @@ function TOOL.BuildCPanel(CPanel)
   CPanel:CheckBox("Enable ghosting", gsToolNameU.."ghosting")
   CPanel:CheckBox("Enable adviser", gsToolNameU.."adviser")
 end
-
-
-
-
-
 
