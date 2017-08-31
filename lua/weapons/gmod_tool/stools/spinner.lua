@@ -19,7 +19,6 @@ local varRemoveER  = CreateConVar("sbox_en" ..gsSentName.."_remerr", 1, gnVarFla
 local varEnableWT  = CreateConVar("sbox_en" ..gsSentName.."_wdterr", 1, gnVarFlags, "When enabled takes the watchdog timer for an actual error")
 local varEnableDT  = CreateConVar("sbox_en" ..gsSentName.."_timdbg", 1, gnVarFlags, "When enabled outputs the rate status on the wire output")
 
-local gnRatio      = 1.61803398875
 local gsToolName   = gsSentName
 local gsToolNameU  = gsToolName.."_"
 local gsEntLimit   = gsSentName.."s"
@@ -127,7 +126,7 @@ TOOL.ClientConVar = {
   ["keyrev"    ] = "39",
   ["lever"     ] = "10",
   ["levercnt"  ] = "2",
-  ["drawfrc"   ] = "30",      -- How long is the scaled force line
+  ["drwscale"  ] = "30",      -- How long is the scaled force line
   ["power"     ] = "100",     -- Power of the spinner the bigger the faster
   ["radius"    ] = "0",       -- Radius if bigger than zero circular collision is used
   ["toggle"    ] = "0",       -- Remain in a spinning state when the numpad is released
@@ -195,7 +194,7 @@ function TOOL:GetToggle()
 end
 
 function TOOL:GetDrawScale()
-  return math.Clamp(self:GetClientNumber("drawfrc"),1,varMaxScale:GetFloat())
+  return math.Clamp(self:GetClientNumber("drwscale"),1,varMaxScale:GetFloat())
 end
 
 function TOOL:GetPower()
@@ -470,16 +469,21 @@ local function drawCircleSpinner(xyO, nRad, sCl)
   surface.DrawCircle(xyO.x, xyO.y, nRad, sCl and gtPalette[sCl] or gtPalette["w"])
 end
 
+function TOOL:GetRadiusRatio(stTrace, oPly)
+  local nRatio = 1.61803398875
+  local ratiom = (gnRatio * 1000)
+  local ratioc = (gnRatio - 1) * 100
+  local plyd   = (stTrace.HitPos - oPly:GetPos()):Length()
+  return (1.2 * math.Clamp(ratiom / plyd, 1, ratioc))
+end
+
 function TOOL:DrawHUD()
   if(self:GetAdviser()) then
-    local ply,     = LocalPlayer()
-    local stTrace  = ply:GetEyeTrace()
-    local axs      = self:GetDrawScale()
-    local trEnt    = stTrace.Entity
-    local ratiom   = (gnRatio * 1000)
-    local ratioc   = (gnRatio - 1) * 100
-    local plyd     = (stTrace.HitPos - ply:GetPos()):Length()
-    local radc     = 1.2 * math.Clamp(ratiom / plyd, 1, ratioc)
+    local ply   = LocalPlayer()
+    local stTr  = ply:GetEyeTrace()
+    local trEnt = stTr.Entity
+    local axs   = self:GetDrawScale()
+    local radc  = self:GetRadiusRatio(stTr, ply)
     if(trEnt and trEnt:IsValid()) then
       local cls    = trEnt:GetClass()
       if(cls == gsSentHash) then
@@ -512,7 +516,7 @@ function TOOL:DrawHUD()
         local vF, vL, vA, vPos
         local daxs, dlev = self:GetDirectionID()
         if(daxs == 0 and dlev == 0) then
-          vF, vL, vA = self:RecalculateUCS(stTrace.HitNormal, ply:GetRight())
+          vF, vL, vA = self:RecalculateUCS(stTr.HitNormal, ply:GetRight())
           vPos = trEnt:LocalToWorld(trEnt:GetNWVector(gsSentHash.."_cen"))
         else
           local vMin, vMax = trEnt:GetRenderBounds()
@@ -604,7 +608,7 @@ function TOOL.BuildCPanel(CPanel)
   CPanel:NumSlider("Offset pitch: ", gsToolNameU.."angp"     , -gnMaxAng, gnMaxAng, 3)
   CPanel:NumSlider("Offset yaw: "  , gsToolNameU.."angy"     , -gnMaxAng, gnMaxAng, 3)
   CPanel:NumSlider("Offset roll: " , gsToolNameU.."angr"     , -gnMaxAng, gnMaxAng, 3)
-  CPanel:NumSlider("Draw scale: " , gsToolNameU.."drawfrc"  , 0, varMaxScale:GetFloat(), 3)
+  CPanel:NumSlider("Draw scale: "  , gsToolNameU.."drwscale" , 0, varMaxScale:GetFloat(), 3)
   CPanel:CheckBox("Toggle", gsToolNameU.."toggle")
   CPanel:CheckBox("NoCollide with trace", gsToolNameU.."nocollide")
   CPanel:CheckBox("Enable ghosting", gsToolNameU.."ghosting")
