@@ -10,8 +10,6 @@
 
 AddCSLuaFile()
 
-print("SENT:",SysTime(),RealTime(),CurTime())
-
 local sysNow       = SysTime
 local curNow       = CurTime
 local gsSentHash   = "sent_spinner"

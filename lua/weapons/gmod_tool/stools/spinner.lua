@@ -7,11 +7,9 @@
  * Created  : Using tool requirement
  * Defines  : Spinner manager script
 ]]--
-print("SPINNER:",SysTime())
-
 local gsSentHash   = "sent_spinner"
 local gsSentName   = gsSentHash:gsub("sent_","")
-local gnVarFlags = bit.bor(FCVAR_ARCHIVE, FCVAR_ARCHIVE_XBOX, FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_PRINTABLEONLY)
+local gnVarFlags   = bit.bor(FCVAR_ARCHIVE, FCVAR_ARCHIVE_XBOX, FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_PRINTABLEONLY)
 local varMaxScale  = CreateConVar("sbox_max"..gsSentName.."_scale" , 50000, gnVarFlags, "Maximum scale for power and lever")
 local varMaxMass   = CreateConVar("sbox_max"..gsSentName.."_mass"  , 50000, gnVarFlags, "The maximum mass the entity can have")
 local varMaxRadius = CreateConVar("sbox_max"..gsSentName.."_radius", 1000, gnVarFlags, "Maximum radius when rebuilding the collision model as sphere")
@@ -129,6 +127,7 @@ TOOL.ClientConVar = {
   ["keyrev"    ] = "39",
   ["lever"     ] = "10",
   ["levercnt"  ] = "2",
+  ["drawfrc"   ] = "30",      -- How long is the scaled force line
   ["power"     ] = "100",     -- Power of the spinner the bigger the faster
   ["radius"    ] = "0",       -- Radius if bigger than zero circular collision is used
   ["toggle"    ] = "0",       -- Remain in a spinning state when the numpad is released
@@ -193,6 +192,10 @@ end
 
 function TOOL:GetToggle()
   return tobool(self:GetClientNumber("toggle") or false)
+end
+
+function TOOL:GetDrawScale()
+  return math.Clamp(self:GetClientNumber("drawfrc"),1,varMaxScale:GetFloat())
 end
 
 function TOOL:GetPower()
@@ -469,8 +472,9 @@ end
 
 function TOOL:DrawHUD()
   if(self:GetAdviser()) then
-    local ply, axs = LocalPlayer(), 30
+    local ply,     = LocalPlayer()
     local stTrace  = ply:GetEyeTrace()
+    local axs      = self:GetDrawScale()
     local trEnt    = stTrace.Entity
     local ratiom   = (gnRatio * 1000)
     local ratioc   = (gnRatio - 1) * 100
@@ -556,7 +560,7 @@ function TOOL.BuildCPanel(CPanel)
   local pComboAxis = CPanel:ComboBox("Axis direction", gsToolNameU.."diraxis")
         pComboAxis:SetPos(2, CurY)
         pComboAxis:SetTall(20)
-        pComboAxis:AddChoice("Autosave", 0)
+        pComboAxis:AddChoice("<Custom>", 0)
         pComboAxis:AddChoice("+X Red  ", 1)
         pComboAxis:AddChoice("+Y Green", 2)
         pComboAxis:AddChoice("+Z Blue ", 3)
@@ -568,7 +572,7 @@ function TOOL.BuildCPanel(CPanel)
   local pComboLever = CPanel:ComboBox("Lever direction", gsToolNameU.."dirlever")
         pComboLever:SetPos(2, CurY)
         pComboLever:SetTall(20)
-        pComboLever:AddChoice("Autosave", 0)
+        pComboLever:AddChoice("<Custom>", 0)
         pComboLever:AddChoice("+X Red  ", 1)
         pComboLever:AddChoice("+Y Green", 2)
         pComboLever:AddChoice("+Z Blue ", 3)
@@ -600,6 +604,7 @@ function TOOL.BuildCPanel(CPanel)
   CPanel:NumSlider("Offset pitch: ", gsToolNameU.."angp"     , -gnMaxAng, gnMaxAng, 3)
   CPanel:NumSlider("Offset yaw: "  , gsToolNameU.."angy"     , -gnMaxAng, gnMaxAng, 3)
   CPanel:NumSlider("Offset roll: " , gsToolNameU.."angr"     , -gnMaxAng, gnMaxAng, 3)
+  CPanel:NumSlider("Draw scale: " , gsToolNameU.."drawfrc"  , 0, varMaxScale:GetFloat(), 3)
   CPanel:CheckBox("Toggle", gsToolNameU.."toggle")
   CPanel:CheckBox("NoCollide with trace", gsToolNameU.."nocollide")
   CPanel:CheckBox("Enable ghosting", gsToolNameU.."ghosting")
