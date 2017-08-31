@@ -474,7 +474,7 @@ function TOOL:GetRadiusRatio(stTrace, oPly)
   local ratiom = (gnRatio * 1000)
   local ratioc = (gnRatio - 1) * 100
   local plyd   = (stTrace.HitPos - oPly:GetPos()):Length()
-  return (1.2 * math.Clamp(ratiom / plyd, 1, ratioc))
+  return (nRatio * math.Clamp(ratiom / plyd, 1, ratioc))
 end
 
 function TOOL:DrawHUD()
