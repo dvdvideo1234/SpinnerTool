@@ -13,11 +13,12 @@ local gnVarFlags   = bit.bor(FCVAR_ARCHIVE, FCVAR_ARCHIVE_XBOX, FCVAR_NOTIFY, FC
 local varMaxScale  = CreateConVar("sbox_max"..gsSentName.."_scale" , 50000, gnVarFlags, "Maximum scale for power and lever")
 local varMaxMass   = CreateConVar("sbox_max"..gsSentName.."_mass"  , 50000, gnVarFlags, "The maximum mass the entity can have")
 local varMaxRadius = CreateConVar("sbox_max"..gsSentName.."_radius", 1000, gnVarFlags, "Maximum radius when rebuilding the collision model as sphere")
-local varBroadCast = CreateConVar("sbox_max"..gsSentName.."_broad" , 300, gnVarFlags, "Maximum time [ms] when reached the think method sends client stuff")
-local varTickRate  = CreateConVar("sbox_max"..gsSentName.."_tick"  , 5, gnVarFlags, "Maximum sampling time [ms] when the spinner is activated. Be careful!")
+local varMaxLine   = CreateConVar("sbox_max"..gsSentName.."_line"  , 1000, gnVarFlags, "Maximum linear offset for gereral stuff and panel handling")
+local varBroadCast = CreateConVar("sbox_max"..gsSentName.."_broad" , 250, gnVarFlags, "Maximum time [ms] when reached the think method sends client stuff")
+local varTickRate  = CreateConVar("sbox_max"..gsSentName.."_tick"  , 20, gnVarFlags, "Maximum sampling time [ms] when the spinner is activated. Be careful!")
 local varRemoveER  = CreateConVar("sbox_en" ..gsSentName.."_remerr", 1, gnVarFlags, "When enabled removes the spinner when an error is present")
 local varEnableWT  = CreateConVar("sbox_en" ..gsSentName.."_wdterr", 1, gnVarFlags, "When enabled takes the watchdog timer for an actual error")
-local varEnableDT  = CreateConVar("sbox_en" ..gsSentName.."_timdbg", 1, gnVarFlags, "When enabled outputs the rate status on the wire output")
+local varEnableDT  = CreateConVar("sbox_en" ..gsSentName.."_timdbg", 0, gnVarFlags, "When enabled outputs the rate status on the wire output")
 
 local gsToolName   = gsSentName
 local gsToolNameU  = gsToolName.."_"
@@ -161,9 +162,10 @@ local function GetDirectionID(nID)
 end
 
 function TOOL:GetDeviation()
-  return Vector(math.Clamp(self:GetClientNumber("linx"),-gnMaxLin,gnMaxLin),
-                math.Clamp(self:GetClientNumber("liny"),-gnMaxLin,gnMaxLin),
-                math.Clamp(self:GetClientNumber("linz"),-gnMaxLin,gnMaxLin)),
+  local nMaxLine = varMaxLine:GetFloat()
+  return Vector(math.Clamp(self:GetClientNumber("linx"),-nMaxLine,nMaxLine),
+                math.Clamp(self:GetClientNumber("liny"),-nMaxLine,nMaxLine),
+                math.Clamp(self:GetClientNumber("linz"),-nMaxLine,nMaxLine)),
          Angle (math.Clamp(self:GetClientNumber("angp"),-gnMaxAng,gnMaxAng),
                 math.Clamp(self:GetClientNumber("angy"),-gnMaxAng,gnMaxAng),
                 math.Clamp(self:GetClientNumber("angr"),-gnMaxAng,gnMaxAng))
@@ -194,7 +196,7 @@ function TOOL:GetToggle()
 end
 
 function TOOL:GetDrawScale()
-  return math.Clamp(self:GetClientNumber("drwscale"),1,varMaxScale:GetFloat())
+  return math.Clamp(self:GetClientNumber("drwscale"),0,varMaxLine:GetFloat())
 end
 
 function TOOL:GetPower()
@@ -373,7 +375,9 @@ function TOOL:LeftClick(stTrace)
     if(trEnt and trEnt:IsValid()) then
       if(not self:UpdateVectors(stSpinner)) then return false end
       if(trEnt:GetClass() == gsSentHash) then
-        stSpinner.Radi = 0; trEnt:Setup(stSpinner) -- Do not recreate the physics on update
+        stSpinner.Radi = 0     -- Do not recreate the physics on update
+        trEnt:Setup(stSpinner) -- Apply general data from the cvars
+        trEnt:ApplyTweaks()    -- No need respawn the entity to update the tweaks
         ply:SendLua("GAMEMODE:AddNotify(\"Spinner updated !\", NOTIFY_UNDO, 6)")
         ply:SendLua("surface.PlaySound(\"ambient/water/drip"..math.random(1, 4)..".wav\")")
         return true
@@ -471,8 +475,8 @@ end
 
 function TOOL:GetRadiusRatio(stTrace, oPly)
   local nRatio = 1.61803398875
-  local ratiom = (gnRatio * 1000)
-  local ratioc = (gnRatio - 1) * 100
+  local ratiom = (nRatio * 1000)
+  local ratioc = (nRatio - 1) * 100
   local plyd   = (stTrace.HitPos - oPly:GetPos()):Length()
   return (nRatio * math.Clamp(ratiom / plyd, 1, ratioc))
 end
@@ -539,6 +543,8 @@ end
 
 local conVarList = TOOL:BuildConVarList()
 function TOOL.BuildCPanel(CPanel)
+  local nMaxLine  = varMaxLine:GetFloat()
+  local nMaxScale = varMaxScale:GetFloat()
   local CurY, pItem = 0 -- pItem is the current panel created
           CPanel:SetName(language.GetPhrase("tool."..gsToolName..".name"))
   pItem = CPanel:Help   (language.GetPhrase("tool."..gsToolName..".desc"))
@@ -594,21 +600,21 @@ function TOOL.BuildCPanel(CPanel)
                   ButtonSize = 10 } );
 
   CPanel:NumSlider("Mass: "        , gsToolNameU.."mass"     , 1, varMaxMass:GetFloat(), 3)
-  CPanel:NumSlider("Power: "       , gsToolNameU.."power"    ,-varMaxScale:GetFloat(), varMaxScale:GetFloat(), 3)
-  CPanel:NumSlider("Friction: "    , gsToolNameU.."friction" , 0, varMaxScale:GetFloat(), 3)
-  CPanel:NumSlider("Force limit: " , gsToolNameU.."forcelim" , 0, varMaxScale:GetFloat(), 3)
-  CPanel:NumSlider("Torque limit: ", gsToolNameU.."torqulim" , 0, varMaxScale:GetFloat(), 3)
-  CPanel:NumSlider("Lever: "       , gsToolNameU.."lever"    , 0, varMaxScale:GetFloat(), 3)
-  CPanel:NumSlider("Lever count: " , gsToolNameU.."levercnt" , 1, gnMaxAng, 3)
+  CPanel:NumSlider("Power: "       , gsToolNameU.."power"    ,-nMaxScale, nMaxScale, 3)
+  CPanel:NumSlider("Friction: "    , gsToolNameU.."friction" , 0, nMaxScale, 3)
+  CPanel:NumSlider("Force limit: " , gsToolNameU.."forcelim" , 0, nMaxScale, 3)
+  CPanel:NumSlider("Torque limit: ", gsToolNameU.."torqulim" , 0, nMaxScale, 3)
+  CPanel:NumSlider("Lever: "       , gsToolNameU.."lever"    , 0, nMaxScale, 3)
+  CPanel:NumSlider("Lever count: " , gsToolNameU.."levercnt" , 1, gnMaxAng , 3)
   CPanel:NumSlider("Radius: "      , gsToolNameU.."radius"   , 0, varMaxRadius:GetFloat(), 3)
   CPanel:Button   ("V Reset offsets V", gsToolNameU.."resetoffs")
-  CPanel:NumSlider("Offset X: "    , gsToolNameU.."linx"     , -gnMaxLin, gnMaxLin, 3)
-  CPanel:NumSlider("Offset Y: "    , gsToolNameU.."liny"     , -gnMaxLin, gnMaxLin, 3)
-  CPanel:NumSlider("Offset Z: "    , gsToolNameU.."linz"     , -gnMaxLin, gnMaxLin, 3)
+  CPanel:NumSlider("Offset X: "    , gsToolNameU.."linx"     , -nMaxLine, nMaxLine, 3)
+  CPanel:NumSlider("Offset Y: "    , gsToolNameU.."liny"     , -nMaxLine, nMaxLine, 3)
+  CPanel:NumSlider("Offset Z: "    , gsToolNameU.."linz"     , -nMaxLine, nMaxLine, 3)
   CPanel:NumSlider("Offset pitch: ", gsToolNameU.."angp"     , -gnMaxAng, gnMaxAng, 3)
   CPanel:NumSlider("Offset yaw: "  , gsToolNameU.."angy"     , -gnMaxAng, gnMaxAng, 3)
   CPanel:NumSlider("Offset roll: " , gsToolNameU.."angr"     , -gnMaxAng, gnMaxAng, 3)
-  CPanel:NumSlider("Draw scale: "  , gsToolNameU.."drwscale" , 0, varMaxScale:GetFloat(), 3)
+  CPanel:NumSlider("Draw scale: "  , gsToolNameU.."drwscale" , 0, nMaxLine, 3)
   CPanel:CheckBox("Toggle", gsToolNameU.."toggle")
   CPanel:CheckBox("NoCollide with trace", gsToolNameU.."nocollide")
   CPanel:CheckBox("Enable ghosting", gsToolNameU.."ghosting")

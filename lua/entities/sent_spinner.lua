@@ -37,6 +37,10 @@ ENT.Editable        = true
 ENT.Spawnable       = false
 ENT.AdminSpawnable  = false
 
+local function getSign(nN)
+  return (nN / math.abs(nN))
+end
+
 function ENT:GetPower()
   if(SERVER)     then local oSent = self[gsSentHash]; return oSent.Power
   elseif(CLIENT) then return self:GetNWFloat(gsSentHash.."_power") end
@@ -85,15 +89,12 @@ if(SERVER) then
   }
   -- Used for rate array output
   local tRateMap = {
-    [1]  = "bcTot",
-    [2]  = "bcTim",
-    [3]  = "eTick",
-    [4]  = "thStO",
-    [5]  = "thStN",
-    [6]  = "thEnd",
-    [7]  = "thTim",
-    [8]  = "thEvt",
-    [9]  = "thDet"
+    [1]  = {"bcTot", 1000},
+    [2]  = {"bcTim", 1000},
+    [3]  = {"eTick", 1000},
+    [4]  = {"thTim", 1000},
+    [5]  = {"thEvt", 1000},
+    [6]  = {"thDet", 1.00}
   }
   --[[
    * User sets the desired times in [ms] and the entity converts them to seconds
@@ -103,8 +104,8 @@ if(SERVER) then
     local tmRate = self[gsSentHash].Rate
     local mpTime = tmRate.mpTim
     for ID = 1, #tRateMap do
-      local key = tRateMap[ID]
-      mpTime[ID] = tmRate[key]
+      local set = tRateMap[ID]
+      mpTime[ID] = (tmRate[set[1]] * set[2])
     end
     return mpTime
   end
@@ -239,7 +240,17 @@ if(SERVER) then
   function ENT:SetToggled(bTogg)
     local oSent = self[gsSentHash]; oSent.Togg = tobool(bTogg or false)
     self:SetNWBool(gsSentHash.."_togg", oSent.Togg) end
-
+  
+  function ENT:ApplyTweaks()
+    local oSent  = self[gsSentHash]
+    oSent.IsERM = varRemoveER:GetBool() -- Whenever to remove the entity on error
+    oSent.IsTDB = varEnableDT:GetBool() -- Enables the tick rate system array output
+    oSent.Rate.isWDT = varEnableWT:GetBool() -- Translate SENT watchdog to an error
+    oSent.Rate.bcTot = (varBroadCast:GetFloat() / 1000) -- Broadcast time sever-clients [ms] to [s]
+    oSent.Rate.bcTim = (varBroadCast:GetFloat() / 1000) -- Broadcast compare value      [ms] to [s]
+    oSent.Rate.eTick = (varTickRate:GetFloat()  / 1000) -- Entity ticking interval      [ms] to [s]
+  end
+  
   function ENT:Setup(stSpinner)
     self:SetPhysRadius(stSpinner.Radi)         -- Set the radius if given
     local oPhys = self:GetPhysicsObject()
@@ -277,12 +288,11 @@ if(SERVER) then
     WireLib.TriggerOutput(self, sOut, anyVal); return self
   end
 
-  function self:Tic()
-    local oSent = self[gsSentHash]
-    local tmRate = oSent.Rate
+  function ENT:Tic()
+    local tmRate = self[gsSentHash].Rate
     self:NextThink(curNow() + tmRate.eTick) -- Prepare the next think [s]
     tmRate.thStO = tmRate.thStN     -- The tick start time gets older [s]
-    tmRate.thStN = getNow()         -- Read the new think start time [s]
+    tmRate.thStN = sysNow()         -- Read the new think start time [s]
     if(tmRate.isRdy) then           -- When rate structure is initialized
       tmRate.thEvt = (tmRate.thStN - tmRate.thStO) -- Think event delta [s]
       tmRate.thTim = (tmRate.thEnd - tmRate.thStO) -- Think hook delta [s]
@@ -293,9 +303,9 @@ if(SERVER) then
     end
   end
 
-  function self:Toc()
+  function ENT:Toc()
     local tmRate = self[gsSentHash].Rate
-    tmRate.thEnd = getNow()
+    tmRate.thEnd = sysNow()
     if(not tmRate.isRdy) then tmRate.isRdy = true end
   end
 
@@ -314,23 +324,26 @@ if(SERVER) then
 
   function ENT:Think()
     self:Tic()
+    local Pw, Le, wFr, wLe, wPw
     local oSent = self[gsSentHash]
-    local oPhys, Pw, Le = self:GetPhysicsObject(), 0, 0
+    local oPhys = self:GetPhysicsObject()
     if(oPhys and oPhys:IsValid()) then
       local vCn = self:LocalToWorld(oPhys:GetMassCenter())
-      local wFr, wLe, wPw
       if(WireLib) then
         local wOn = self:ReadWire("On")
               wPw = self:ReadWire("Power")
               wLe = self:ReadWire("Lever")
               wFr = self:ReadWire("Force")
+        print("W", wOn, wPw, wLe)
         if(wOn ~= nil) then oSent.On = (wOn ~= 0) end -- On connected toggle with wire
       end -- Remember internal settings for lever and power when wire is disconnected
       if(oSent.On) then -- Disable toggling via numpad if wire is connected
         local vPwt, vLvt, eAng = oSent.PowT, oSent.LevT, self:GetAngles()
         local vLew, vAxw, aLev = oSent.LevW, oSent.AxiW, oSent.LAng
-        Le = ((wLe ~= nil) and wLe or oSent.Lever) -- Do not wipe internals in disconnect
-        Pw = ((wPw ~= nil) and wPw or (oSent.Power * oSent.Dir))
+        Le = (wLe and wLe or  oSent.Lever) -- Do not wipe internals in disconnect
+        Pw = (wPw and wPw or (oSent.Power * oSent.Dir))
+        print("GO", Pw, Le)
+        print("HY", oSent.Power, oSent.Dir)
         vAxw:Set(oSent.AxiL); vAxw:Rotate(eAng)
         vLew:Set(oSent.LevL); vLew:Rotate(eAng)
         aLev:Set(vLew:AngleEx(vAxw))
@@ -349,30 +362,40 @@ if(SERVER) then
     else self:SetError("ENT.Think: Physics invalid"); end
     if(WireLib and oSent.IsTDB) then
       self:WriteWire("Rate", self:GetRateMap()) end
-    self:Toc(); self:BroadCast(Pw, Le); return true
+    self:Toc(); self:BroadCast(wPw and wPw or oSent.Power, wLe and wLe or oSent.Lever); return true
   end
 
   local function spinForward(oPly, oEnt)
     if(not (oEnt and oEnt:IsValid())) then return end
     if(not (oEnt:GetClass() == gsSentHash)) then return end
-    local Data = oEnt[gsSentHash]
-    if(Data.On and oEnt:IsToggled()) then Data.On = false
-    else Data.Dir, Data.On = 1, true end
+    local oSent = oEnt[gsSentHash]
+    if(oEnt:IsToggled()) then
+      if(oSent.On) then oSent.On, oSent.Dir = false, 0
+      else              oSent.On, oSent.Dir = true , 1 end
+    else
+      oSent.On, oSent.Dir = true, 1
+    end
   end
 
   local function spinReverse(oPly, oEnt)
     if(not (oEnt and oEnt:IsValid())) then return end
     if(not (oEnt:GetClass() == gsSentHash)) then return end
-    local Data = oEnt[gsSentHash]
-    if(Data.On and oEnt:IsToggled()) then Data.On = false
-    else Data.Dir, Data.On = -1, true end
+    local oSent = oEnt[gsSentHash]
+    if(oEnt:IsToggled()) then
+      if(oSent.On) then oSent.On, oSent.Dir = false,  0
+      else              oSent.On, oSent.Dir = true , -1 end
+    else
+      oSent.On, oSent.Dir = true, -1
+    end
   end
 
   local function spinStop(oPly, oEnt)
     if(not (oEnt and oEnt:IsValid())) then return end
     if(not (oEnt:GetClass() == gsSentHash)) then return end
-    local Data = oEnt[gsSentHash]
-    if(not oEnt:IsToggled()) then Data.Dir, Data.On = 0, false end
+    local oSent = oEnt[gsSentHash]
+    if(not oEnt:IsToggled()) then
+      oSent.On, oSent.Dir = false, 0
+    end
   end
 
   numpad.Register(gsSentHash.."_spinForward_On" , spinForward)

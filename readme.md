@@ -84,6 +84,7 @@ A: Well yeah, you can play around with these using the console
   sbox_maxspinner_scale   --> Maximum scale for power and lever
   sbox_maxspinner_mass    --> The maximum mass the entity can have
   sbox_maxspinner_radius  --> Maximum radius when rebuilding the collision model as sphere
+  sbox_maxspinner_line    --> Maximum linear offset for panel and clamping on the tool script
   sbox_maxspinner_broad   --> Maximum time [ms] when reached the think method sends client stuff
   sbox_maxspinner_tick    --> Maximum sampling time [ms] when the spinner is activated. Be careful!
   sbox_enspinner_remerr   --> When enabled removes the spinner when an error is present
