@@ -75,11 +75,11 @@ A: You have basically two HUD modes:
 
 Q: I just created a fidget spinner but when I hit the forward numpad key and
    it goes in reverse ?
-A: Keep in mind that of you apply negative power, the torque will be reversed
-   when using the numpad. The wire input is independent it does not take the
-   numpad direction into consideration.
+A: Keep in mind that if you apply negative power, the torque will be reversed
+   when using the numpad. The wire input is independent. It does not take the
+   numpad direction into consideration as the value includes sign and magnitude.
 
-Q: Does this thin have some kind of tweaks ?
+Q: Does this thing have some kind of tweaks ?
 A: Well yeah, you can play around with these using the console
   sbox_maxspinner_scale   --> Maximum scale for power and lever
   sbox_maxspinner_mass    --> The maximum mass the entity can have
@@ -92,14 +92,14 @@ A: Well yeah, you can play around with these using the console
   sbox_enspinner_timdbg   --> When enabled outputs the rate status on the wire output
 N: The watchdog timer will be activated when the program in the think
      hook takes more time to execute than the actual entity tick integral chosen
-   For using the timer debug array as a wire input, the user must set the convar
+   For using the timer debug array as a wire output, the user must set the convar
      to enabled, then create a spinner to invoke the initializing method
    The maximum spinner tick is the time between two think hook calls
      and it is used on spinner initialization. Be careful, do not set this too low !
 
 Q: May I put this in a third party website.
 A: Ahh, this again. Emm, NO. I will never give you my permission to do that.
-   By doing this you are forcing people to use an older copy of this script !
+   By doing this, you are forcing people to use an older copy of this script !
 
 ```
 Have a nice time spinning this up !
