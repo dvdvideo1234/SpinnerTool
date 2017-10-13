@@ -176,8 +176,6 @@ if(SERVER) then
     end; return true
   end
 
-
-
   local function getPower(vRes, vVec, nNum)
     vRes:Set(vVec); vRes:Mul(nNum); return vRes end
 
@@ -240,7 +238,7 @@ if(SERVER) then
   function ENT:SetToggled(bTogg)
     local oSent = self[gsSentHash]; oSent.Togg = tobool(bTogg or false)
     self:SetNWBool(gsSentHash.."_togg", oSent.Togg) end
-  
+
   function ENT:ApplyTweaks()
     local oSent  = self[gsSentHash]
     oSent.IsERM = varRemoveER:GetBool() -- Whenever to remove the entity on error
@@ -250,7 +248,7 @@ if(SERVER) then
     oSent.Rate.bcTim = (varBroadCast:GetFloat() / 1000) -- Broadcast compare value      [ms] to [s]
     oSent.Rate.eTick = (varTickRate:GetFloat()  / 1000) -- Entity ticking interval      [ms] to [s]
   end
-  
+
   function ENT:Setup(stSpinner)
     self:SetPhysRadius(stSpinner.Radi)         -- Set the radius if given
     local oPhys = self:GetPhysicsObject()
