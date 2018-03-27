@@ -78,7 +78,7 @@ end
 
 function ENT:IsToggled()
   if(SERVER)     then local oSent = self[gsSentHash]; return oSent.Togg
-  elseif(CLIENT) then return self:GetNWVector(gsSentHash.."_togg") end
+  elseif(CLIENT) then return self:GetNWBool(gsSentHash.."_togg") end
 end
 
 if(SERVER) then
