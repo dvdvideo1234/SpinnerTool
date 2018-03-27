@@ -4,7 +4,7 @@
 
 #### What does this thing do ?
 This entity defines a fidget spinner inside the game Garry's mod.
-It can use prop for a spinner by creating a bunch for circular forces
+It can use prop for a spinner by creating a bunch for circular [forces][force_ref]
 to spin the physics model around.
 
 #### Why did you make this ?
@@ -20,45 +20,40 @@ receives high angular velocities
 
 #### How can I control this scripted entity ?
 That's fairly easy. There is a dedicated spinner tool already in `Construction/Spinner Tool`.
-  1. **Create** a spinner [IN_ATTACK ( Def: Left click )](https://wiki.garrysmod.com/page/Enums/IN)
-    When you trace a prop it will be automatically constrained relative to the
-      mass-center when you use one option from the `Constraint type` combo box
-      besides skipping the constraint all around via `Skip linking`
+  1. **Create** a spinner [IN_ATTACK ( Def: Left click )](https://wiki.garrysmod.com/page/Enums/IN) \
+    When you trace a prop it will be automatically be constrained relative to the\
+      mass-center to the trace when you use one option from the `Constraint type` combo box\
+      besides skipping the constraint all around via `Skip linking`\
     When you trace the world, it will just spawn it on the map.
-  2. **Update** a spinner [IN_ATTACK ( Def: Left click )](https://wiki.garrysmod.com/page/Enums/IN)
+  2. **Update** a spinner [IN_ATTACK ( Def: Left click )](https://wiki.garrysmod.com/page/Enums/IN) \
     This is done for every parameter except the modified collision radius to
       avoid making lua errors in the [think hook](https://wiki.garrysmod.com/page/GM/Think). This option actually destroys
-      the physics object and creates new again, so your contraption [constraints](https://wiki.garrysmod.com/page/constraint) will just fail.
-  3. **Select** a prop to use as a spinner [IN_ATTACK2 ( Def: Right click )](https://wiki.garrysmod.com/page/Enums/IN)
-    When tracing a valid physics prop, the trace normal vector will become the
-      spin axis, the right player vector will become force lever and their cross
+      the physics object and creates new again, so your contraption [constraints](https://wiki.garrysmod.com/page/constraint)
+      will just fail if I am to update that parameter
+  3. **Select** a prop to use as a spinner [IN_ATTACK2 ( Def: Right click )](https://wiki.garrysmod.com/page/Enums/IN) \
+    When tracing a valid `prop_physics`, the trace [normal vector](https://en.wikipedia.org/wiki/Normal_(geometry)) will become the
+      [spin axis][axis_ref] the right player vector will become force lever and their [cross product][cross_ref]
       will result in the force direction. The model will also get selected
-  4. **Copy** spinner settings [IN_ATTACK2 ( Def: Right click )](https://wiki.garrysmod.com/page/Enums/IN)
+  4. **Copy** spinner settings [IN_ATTACK2 ( Def: Right click )](https://wiki.garrysmod.com/page/Enums/IN) \
     When tracing a spinner, you can copy all its internal setup values and
       apply these to other entity of the same class `sent_spinner`
 
 #### What are the lever and axis directions ?
 A: Using this you can chose:
-  1. [Spin axis](https://en.wikipedia.org/wiki/Rotation). The local vector to use for an axis
+  1. [Spin axis][axis_ref] is the local [vector][vector_ref] to use for an axis
   a.k.a the vector which the spinner revolves around.
-  2. [Lever](https://en.wikipedia.org/wiki/Position_(vector)). Which local vector to use as a
-  force offset origin affecting the angle for starting the force lever creation.\
-  [The cross product](https://en.wikipedia.org/wiki/Cross_product) between (1) and (2) defines
-  where the direction of the force is pointing at. If you do not want to define your own vectors,
-  you can use the already pre-defined values by selecting an axis with a direction sign attached:
+  2. [Lever][force_ref] is the local [vector][vector_ref] which is used as a
+  force offset origin affecting the angle for starting the force [lever][lever_ref] creation.\
+  [The cross product][cross_ref] between (1) and (2) defines
+  where the direction of the [force][force_ref] is pointing at. If you do not want to define your own vectors,
+  you can use the already pre-defined values by selecting a [direction][direction_ref] with a sign attached:
 
-![#ff0000](https://placehold.it/15/ff0000/000000?text=+)
-```+X ( Red ..) --> Forward local vector``` .\
-![#00ff00](https://placehold.it/15/00ff00/000000?text=+)
-```+Y ( Green ) --> Left local vector``` .\
-![#0000ff](https://placehold.it/15/0000ff/000000?text=+)
-```+Z ( Blue .) --> Up local vector``` .\
-![#ff0000](https://placehold.it/15/ff0000/000000?text=+)
-```-X (  Red ..) --> Back local vector``` .\
-![#00ff00](https://placehold.it/15/00ff00/000000?text=+)
-```-Y ( Green ) --> Right local vector``` .\
-![#0000ff](https://placehold.it/15/0000ff/000000?text=+)
-```-Z ( Blue .) --> Down local vector``` .
+![#R][ref_cl_red]   ```+X ( Red ..) --> Forward local vector``` .\
+![#G][ref_cl_green] ```+Y ( Green ) --> Left local vector``` .\
+![#B][ref_cl_blue]  ```+Z ( Blue .) --> Up local vector``` .\
+![#R][ref_cl_red]   ```-X (  Red ..) --> Back local vector``` .\
+![#G][ref_cl_green] ```-Y ( Green ) --> Right local vector``` .\
+![#B][ref_cl_blue]  ```-Z ( Blue .) --> Down local vector``` .
 
 These colors are representing all axises default chosen ones.
 If you want to use your custom lever or axis u can select the `<Custom>`
@@ -69,15 +64,15 @@ will be applied on the new spinner.
 You have basically two HUD modes:
 1. When you trace a spinner
 * The center position will be displayed with a yellow circle.
-* The lever arm(s), using green line(s) ( yes, you can have only\
+* The [lever][lever_ref] arm(s), using green line(s) ( yes, you can have only\
       one arm to the max of 360 ) with the exact length stored in the SENT.
-* Lever forces are scaled to the max value 50k, as\
+* Lever [forces][force_ref] are scaled to the max value 50k, as\
       there is red part, which shows the scale of the whole, maximum\
-      force available and yellow part, which shows the amount of force\
+      [force][force_ref] available and yellow part, which shows the amount of [force][force_ref]\
       used relative to the maximum ( Half red and half yellow means 50%\
       of the maximum power input a.k.a 25k gfu)
 2. When you trace a prop
-*It will show the force (red), axis (blue) and lever (green)\
+* It will show the [force][force_ref] (red), [axis][axis_ref] (blue) and [lever][lever_ref] (green)\
 vectors that will be used for the user customizable setup optoion
 
 #### I just created a fidget spinner but when I hit the forward numpad key and it goes in reverse ?
@@ -99,18 +94,25 @@ Well yeah, you can play around with these using the console
   sbox_enspinner_timdbg  --> When enabled outputs the rate status on the wire output
 ```
 * The [watchdog timer](https://en.wikipedia.org/wiki/Watchdog_timer) will be activated when the program in the think
-  hook takes more time to execute than the actual entity tick integral chosen
+  hook takes more time to execute than the actual entity tick interval chosen
 * For using the timer debug array as a wire output, the user must set the convar
   to enabled, then create a spinner to invoke the initializing method
 * The maximum spinner tick is the time between two think hook calls
   and it is used on spinner initialization. Be careful, do not set this too low !
 
-#### May I put this in a third party website.
+#### May I put this in a third party website ?
 Ahh, this again. Emm, NO. I will never give you my permission to do that.\
 By doing this, you are forcing people to use an older copy of this script !
 
 
 ### Have a nice time spinning this up !
 
-
-
+[force_ref]: https://en.wikipedia.org/wiki/Force
+[lever_ref]: https://en.wikipedia.org/wiki/Lever
+[axis_ref]: https://en.wikipedia.org/wiki/Rotation_around_a_fixed_axis
+[vector_ref]: https://en.wikipedia.org/wiki/Euclidean_vector
+[direction_ref]: https://en.wikipedia.org/wiki/Direction_vector
+[cross_ref]: https://en.wikipedia.org/wiki/Cross_product
+[ref_cl_red]: https://placehold.it/15/ff0000/000000?text=+
+[ref_cl_green]: https://placehold.it/15/00ff00/000000?text=+
+[ref_cl_blue]: https://placehold.it/15/0000ff/000000?text=+
