@@ -13,7 +13,7 @@ local gnVarFlags   = bit.bor(FCVAR_ARCHIVE, FCVAR_ARCHIVE_XBOX, FCVAR_NOTIFY, FC
 local varMaxScale  = CreateConVar("sbox_max"..gsSentName.."_scale" , 50000, gnVarFlags, "Maximum scale for power and lever")
 local varMaxMass   = CreateConVar("sbox_max"..gsSentName.."_mass"  , 50000, gnVarFlags, "The maximum mass the entity can have")
 local varMaxRadius = CreateConVar("sbox_max"..gsSentName.."_radius", 1000, gnVarFlags, "Maximum radius when rebuilding the collision model as sphere")
-local varMaxLine   = CreateConVar("sbox_max"..gsSentName.."_line"  , 1000, gnVarFlags, "Maximum linear offset for gereral stuff and panel handling")
+local varMaxLine   = CreateConVar("sbox_max"..gsSentName.."_line"  , 1000, gnVarFlags, "Maximum linear offset for general stuff and panel handling")
 local varBroadCast = CreateConVar("sbox_max"..gsSentName.."_broad" , 250, gnVarFlags, "Maximum time [ms] when reached the think method sends client stuff")
 local varTickRate  = CreateConVar("sbox_max"..gsSentName.."_tick"  , 20, gnVarFlags, "Maximum sampling time [ms] when the spinner is activated. Be careful!")
 local varRemoveER  = CreateConVar("sbox_en" ..gsSentName.."_remerr", 1, gnVarFlags, "When enabled removes the spinner when an error is present")
@@ -37,7 +37,6 @@ local gtPalette    = {}
       gtPalette["y"]  = Color(255,255, 0 ,255)
       gtPalette["c"]  = Color( 0 ,255,255,255)
       gtPalette["gh"] = Color(255,255,255,200)
-
 
 if(SERVER) then
 
@@ -111,22 +110,22 @@ TOOL.Command    = nil -- Command on click (nil for default)
 TOOL.ConfigName = nil -- Configure file name (nil for default)
 
 TOOL.ClientConVar = {
-  ["mass"      ] = "300",
-  ["linx"      ] = "0",
-  ["liny"      ] = "0",
-  ["linz"      ] = "0",
-  ["angp"      ] = "0",
-  ["angy"      ] = "0",
-  ["angr"      ] = "0",
-  ["ghosting"  ] = "1",
-  ["model"     ] = "models/props_phx/trains/tracks/track_1x.mdl",
-  ["friction"  ] = "0",
-  ["forcelim"  ] = "0",
-  ["torqulim"  ] = "0",
-  ["keyfwd"    ] = "45",
-  ["keyrev"    ] = "39",
-  ["lever"     ] = "10",
-  ["levercnt"  ] = "2",
+  ["mass"      ] = "300",     -- Spinner entity mass when created
+  ["linx"      ] = "0",       -- Linear user deviation X
+  ["liny"      ] = "0",       -- Linear user deviation Y
+  ["linz"      ] = "0",       -- Linear user deviation Z
+  ["angp"      ] = "0",       -- Angle user deviation pitch
+  ["angy"      ] = "0",       -- Angle user deviation yaw
+  ["angr"      ] = "0",       -- Angle user deviation roll
+  ["ghosting"  ] = "1",       -- Draws the ghosted prop of the spinner when enabled
+  ["model"     ] = "models/props_trainstation/trainstation_clock001.mdl", -- Spinner entity model
+  ["friction"  ] = "0",       -- Friction for the constraints linking spinner to trace ( if available )
+  ["forcelim"  ] = "0",       -- Force limit on for the constraints linking spinner to trace ( if available )
+  ["torqulim"  ] = "0",       -- Torque limit on for the constraints linking spinner to trace ( if available )
+  ["keyfwd"    ] = "45",      -- Key to spin forward ( to the force ref direction )
+  ["keyrev"    ] = "39",      -- Key to spin in reverse
+  ["lever"     ] = "10",      -- Defines how long each lever of the entity is
+  ["levercnt"  ] = "2",       -- Defines how many force levers the entity created has
   ["drwscale"  ] = "30",      -- How long is the scaled force line
   ["power"     ] = "100",     -- Power of the spinner the bigger the faster
   ["radius"    ] = "0",       -- Radius if bigger than zero circular collision is used
@@ -134,14 +133,14 @@ TOOL.ClientConVar = {
   ["diraxis"   ] = "0",       -- Axis  direction ID matched to /pComboAxis/
   ["dirlever"  ] = "0",       -- Lever direction ID matched to /pComboLever/
   ["adviser"   ] = "1",       -- Enabled drawing the coordinates of the props or spinner parameters
-  ["nocollide" ] = "0",       -- Enagled creates a no-collision constraint between it and trace
+  ["nocollide" ] = "0",       -- Enabled creates a no-collision constraint between it and the trace
   ["constraint"] = "0",       -- Constraint type matched to /pComboConst/
   ["cusaxis"   ] = "[0,0,0]", -- Local custom spin axis vector
   ["cuslever"  ] = "[0,0,0]"  -- Local custom leverage vector
 }
 
 local function getVector(sV)
-  local v = string.Explode(",",tostring(sV or ""):gsub("%[",""):gsub("%]",""))
+  local v = (","):Explode(tostring(sV or ""):gsub("%[",""):gsub("%]",""))
   return Vector(tonumber(v[1]) or 0, tonumber(v[2]) or 0, tonumber(v[3]) or 0)
 end
 
@@ -357,8 +356,7 @@ function TOOL:LeftClick(stTrace)
   local trEnt = stTrace.Entity
   if(stTrace.HitWorld) then
     if(not self:UpdateVectors(stSpinner)) then return false end
-    local vPos   = stTrace.HitPos
-    local aAng   = stTrace.HitNormal:Angle()
+    local vPos, aAng = stTrace.HitPos, stTrace.HitNormal:Angle()
           aAng:RotateAroundAxis(aAng:Right(), 90)
           aAng = (aAng + (stSpinner.AxiL:Cross(stSpinner.LevL)):AngleEx(stSpinner.AxiL))
           aAng:Normalize()
@@ -382,8 +380,7 @@ function TOOL:LeftClick(stTrace)
         ply:SendLua("surface.PlaySound(\"ambient/water/drip"..math.random(1, 4)..".wav\")")
         return true
       end
-      local vPos = stTrace.HitPos
-      local aAng = stTrace.HitNormal:Angle()
+      local vPos, aAng = stTrace.HitPos, stTrace.HitNormal:Angle()
             aAng:RotateAroundAxis(aAng:Right(), 90)
             aAng = aAng + (stSpinner.AxiL:Cross(stSpinner.LevL)):AngleEx(stSpinner.AxiL)
       local eSpin  = newSpinner(ply, vPos, aAng, stSpinner)
@@ -442,8 +439,7 @@ end
 
 function TOOL:UpdateGhost(oEnt, oPly)
   if(not (oEnt and oEnt:IsValid())) then return end
-  oEnt:SetNoDraw(false)
-  oEnt:DrawShadow(false)
+  oEnt:SetNoDraw(false); oEnt:DrawShadow(false)
   oEnt:SetColor(gtPalette["gh"])
   local stTrace = util.TraceLine(util.GetPlayerTrace(oPly))
   if(not stTrace.Hit) then return end
@@ -455,11 +451,10 @@ function TOOL:Think()
   local ply   = self:GetOwner() -- Player doing the thing
   if(util.IsValidModel(model)) then
     if(self:GetGhosting() and self:GetConstraint() ~= 0) then
-      if(not (self.GhostEntity and
-              self.GhostEntity:IsValid() and
-              self.GhostEntity:GetModel() == model)) then
-        self:MakeGhostEntity(model,VEC_ZERO,ANG_ZERO)
-      end; self:UpdateGhost(self.GhostEntity, ply) -- In client single player the grost is skipped
+      local ghEnt = self.GhostEntity -- Store a local reference to the ghost
+      if(not (ghEnt and ghEnt:IsValid() and ghEnt:GetModel() == model)) then
+        self:MakeGhostEntity(model,VEC_ZERO,ANG_ZERO) end;
+      self:UpdateGhost(ghEnt, ply) -- In client single player the ghost is skipped
     else self:ReleaseGhostEntity() end -- Delete the ghost entity when ghosting is disabled
   end
 end
@@ -485,11 +480,12 @@ function TOOL:DrawHUD()
   if(self:GetAdviser()) then
     local ply   = LocalPlayer()
     local stTr  = ply:GetEyeTrace()
+    if(not stTr) then return end
     local trEnt = stTr.Entity
     local axs   = self:GetDrawScale()
     local radc  = self:GetRadiusRatio(stTr, ply)
     if(trEnt and trEnt:IsValid()) then
-      local cls    = trEnt:GetClass()
+      local cls = trEnt:GetClass()
       if(cls == gsSentHash) then
         local trAng = trEnt:GetAngles()
         local trCen = trEnt:LocalToWorld(trEnt:GetSpinCenter())
@@ -516,8 +512,7 @@ function TOOL:DrawHUD()
             local xyFE = vFoe:ToScreen(); drawLineSpinner(xyFF, xyFE, "r")
           end; dAng:RotateAroundAxis(wvAxs, dA)
         end
-      elseif(cls == "prop_physics") then
-        local vF, vL, vA, vPos
+      elseif(cls == "prop_physics") then local vF, vL, vA, vPos
         local daxs, dlev = self:GetDirectionID()
         if(daxs == 0 and dlev == 0) then
           vF, vL, vA = self:RecalculateUCS(stTr.HitNormal, ply:GetRight())
