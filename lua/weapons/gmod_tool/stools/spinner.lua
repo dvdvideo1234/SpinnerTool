@@ -10,6 +10,7 @@
 local gsSentHash   = "sent_spinner"
 local gsSentName   = gsSentHash:gsub("sent_","")
 local gnVarFlags   = bit.bor(FCVAR_ARCHIVE, FCVAR_ARCHIVE_XBOX, FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_PRINTABLEONLY)
+local varMaxDirOfs = CreateConVar("sbox_max"..gsSentName.."_drofs" , 2000, gnVarFlags, "Maximum direction offset to overcome displacing unit vectors")
 local varMaxScale  = CreateConVar("sbox_max"..gsSentName.."_scale" , 50000, gnVarFlags, "Maximum scale for power and lever")
 local varMaxMass   = CreateConVar("sbox_max"..gsSentName.."_mass"  , 50000, gnVarFlags, "The maximum mass the entity can have")
 local varMaxRadius = CreateConVar("sbox_max"..gsSentName.."_radius", 1000, gnVarFlags, "Maximum radius when rebuilding the collision model as sphere")
@@ -310,13 +311,10 @@ function TOOL:Constraint(eSpin, stTrace)
   local trEnt = stTrace and stTrace.Entity
   if(trEnt and trEnt:IsValid()) then
     local ncon = self:GetConstraint()
-    local bcol = self:GetNoCollide()
-    local nfor = self:GetForceLimit()
-    local ntor = self:GetTorqueLimit()
-    local nfri = self:GetFriction()
-    local hpos = stTrace.HitPos
-    local nbon = stTrace.PhysicsBone
-    local vnrm = 1000 * stTrace.HitNormal -- Keep it long to avoid surface displacement
+    local bcol, nfor = self:GetNoCollide(), self:GetForceLimit()
+    local ntor, nfri = self:GetTorqueLimit(), self:GetFriction()
+    local hpos, nbon = stTrace.HitPos, stTrace.PhysicsBone
+    -- Keep it long to avoid surface displacement
     if(ncon == 0 and bcol) then -- NoCollide
       local C = constraint.NoCollide(eSpin,trEnt,0,nbon)
       if(C) then eSpin:DeleteOnRemove(C); trEnt:DeleteOnRemove(C); return C end
@@ -324,8 +322,9 @@ function TOOL:Constraint(eSpin, stTrace)
       local C = constraint.Weld(eSpin,trEnt,0,nbon,nfor,bcol,false)
       if(C) then eSpin:DeleteOnRemove(C); trEnt:DeleteOnRemove(C); return C end
     elseif(ncon == 2) then -- Axis
+      local vEnrm = varMaxDirOfs:GetFloat() * stTrace.HitNormal
       local LPos1 = eSpin:GetPhysicsObject():GetMassCenter()
-            LPos2 = trEnt:WorldToLocal((eSpin:LocalToWorld(LPos1) + vnrm))
+            LPos2 = trEnt:WorldToLocal((eSpin:LocalToWorld(LPos1) + vEnrm))
       local C = constraint.Axis(eSpin,trEnt,0,nbon,LPos1,LPos2,nfor,ntor,nfri,(bcol and 1 or 0))
       if(C) then eSpin:DeleteOnRemove(C); trEnt:DeleteOnRemove(C); return C end
     elseif(ncon == 3) then -- Ball ( At the center of the spinner )
@@ -406,12 +405,12 @@ function TOOL:RightClick(stTrace)
     local ply = self:GetOwner()
     local cls = trEnt:GetClass()
     if(cls == "prop_physics") then
+      local vPos, nEdr = trEnt:GetPos(), varMaxDirOfs:GetFloat()
       local sPth = string.GetFileFromFilename(trEnt:GetModel())
-      local vPos = trEnt:GetPos()
-      local sAxs = strVector(trEnt:WorldToLocal(vPos + stTrace.HitNormal))
-      local sLvr = strVector(trEnt:WorldToLocal(vPos + ply:GetRight()))
-      ply:ConCommand(gsToolNameU.."cusaxis " ..sAxs.."\n") -- Vector as string
-      ply:ConCommand(gsToolNameU.."cuslever "..sLvr.."\n") -- Vector as string
+      local sAxs = strVector(trEnt:WorldToLocal(vPos + nEdr * stTrace.HitNormal):GetNormalized())
+      local sLvr = strVector(trEnt:WorldToLocal(vPos + nEdr * ply:GetRight()):GetNormalized())
+      ply:ConCommand(gsToolNameU.."cusaxis " ..sAxs.."\n") -- Axis vector as string
+      ply:ConCommand(gsToolNameU.."cuslever "..sLvr.."\n") -- Lever vector as string
       ply:ConCommand(gsToolNameU.."model "   ..trEnt:GetModel().."\n")
       ply:SendLua("GAMEMODE:AddNotify(\"Model: "..sPth.." selected !\", NOTIFY_UNDO, 6)")
       ply:SendLua("surface.PlaySound(\"ambient/water/drip"..math.random(1, 4)..".wav\")"); return true

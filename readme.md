@@ -73,7 +73,7 @@ You have basically two HUD modes:
       of the maximum power input a.k.a 25k gfu)
 2. When you trace a prop
 * It will show the [force][force_ref] (red), [axis][axis_ref] (blue) and [lever][lever_ref] (green)\
-vectors that will be used for the user customizable setup optoion
+vectors that will be used for the user customizable setup option
 
 #### I just created a fidget spinner but when I hit the forward numpad key and it goes in reverse ?
 Keep in mind that if you apply negative power, the torque will be reversed when using the numpad.\
@@ -83,6 +83,7 @@ numpad direction into consideration as the value includes sign and magnitude.
 #### Does this thing have some kind of tweaks ?
 Well yeah, you can play around with these using the console
 ```
+  sbox_maxspinner_drofs  --> The offset unit direction vector magnitude to prevent displacement
   sbox_maxspinner_scale  --> Maximum scale for power and lever
   sbox_maxspinner_mass   --> The maximum mass the entity can have
   sbox_maxspinner_radius --> Maximum radius when rebuilding the collision model as sphere
