@@ -407,8 +407,10 @@ function TOOL:RightClick(stTrace)
     if(cls == "prop_physics") then
       local vPos, nEdr = trEnt:GetPos(), varMaxDirOfs:GetFloat()
       local sPth = string.GetFileFromFilename(trEnt:GetModel())
-      local sAxs = strVector(trEnt:WorldToLocal(vPos + nEdr * stTrace.HitNormal):GetNormalized())
-      local sLvr = strVector(trEnt:WorldToLocal(vPos + nEdr * ply:GetRight()):GetNormalized())
+      local vAxs, vLvr = (nEdr * stTrace.HitNormal), (nEdr * ply:GetRight())
+            vAxs:Add(vPos); vAxs:Set(trEnt:WorldToLocal(vAxs)); vAxs:Normalize()
+            vLvr:Add(vPos); vLvr:Set(trEnt:WorldToLocal(vLvr)); vLvr:Normalize()
+      local sAxs, sLvr = strVector(vAxs), strVector(vLvr)
       ply:ConCommand(gsToolNameU.."cusaxis " ..sAxs.."\n") -- Axis vector as string
       ply:ConCommand(gsToolNameU.."cuslever "..sLvr.."\n") -- Lever vector as string
       ply:ConCommand(gsToolNameU.."model "   ..trEnt:GetModel().."\n")
