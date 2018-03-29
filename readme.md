@@ -71,7 +71,7 @@ You have basically two HUD modes:
       [force][force_ref] available and yellow part, which shows the amount of [force][force_ref]\
       used relative to the maximum ( Half red and half yellow means 50%\
       of the maximum power input a.k.a 25k gfu)
-2. When you trace a prop
+2. When you trace a ordinary prop of class ```prop_physics```
 * It will show the [force][force_ref] (red), [axis][axis_ref] (blue) and [lever][lever_ref] (green)\
 vectors that will be used for the user customizable setup option
 
