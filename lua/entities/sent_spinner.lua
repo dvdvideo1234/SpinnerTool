@@ -343,8 +343,8 @@ if(SERVER) then
         vLew:Set(oSent.LevL); vLew:Rotate(eAng)
         aLev:Set(vLew:AngleEx(vAxw))
         for ID = 1, oSent.CLev do
-          local cLev, cFor = aLev:Forward(), aLev:Right(); cFor:Mul(-1)
-          oPhys:ApplyForceOffset(getPower(vPwt, cFor, Pw), getLever(vLvt, vCn, cLev, Le))
+          local vL, vF = aLev:Forward(), aLev:Right(); vF:Mul(-1)
+          oPhys:ApplyForceOffset(getPower(vPwt, vF, Pw), getLever(vLvt, vCn, vL, Le))
           aLev:RotateAroundAxis(vAxw, oSent.DAng)
         end
         if(WireLib) then -- Take the down-force into account ( if given )

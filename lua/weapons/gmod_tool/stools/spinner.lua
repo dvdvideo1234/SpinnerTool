@@ -499,15 +499,13 @@ function TOOL:DrawHUD()
         drawLineSpinner(xyOO, xyOA, "b")
         drawCircleSpinner(xyOO, radc, "y")
         for ID = 1, spCnt do
-          local vlAn = dAng:Forward()
-          local vfAn = dAng:Right(); vfAn:Mul(-1)
-          local vLev = ((nL * vlAn) + trCen)
+          local vlAn, vfAn = dAng:Forward(), dAng:Right(); vfAn:Mul(-1)
+          local vLev = (nL * vlAn); vLev:Add(trCen)
           local xyLE = vLev:ToScreen(); drawLineSpinner(xyOO, xyLE, "g")
           if(nP ~= 0) then
-            local vFof = ((nF * vfAn) + vLev)
-            local vFoe = ((nE * vfAn) + vLev)
-            local xyFF = vFof:ToScreen(); drawLineSpinner(xyLE, xyFF, "y")
-            local xyFE = vFoe:ToScreen(); drawLineSpinner(xyFF, xyFE, "r")
+            local vF, vE = (nF * vfAn), (nE * vfAn); vF:Add(vLev); vE:Add(vLev)
+            local xyFF = vF:ToScreen(); drawLineSpinner(xyLE, xyFF, "y")
+            local xyFE = vE:ToScreen(); drawLineSpinner(xyFF, xyFE, "r")
           end; dAng:RotateAroundAxis(wvAxs, dA)
         end
       elseif(cls == "prop_physics") then
