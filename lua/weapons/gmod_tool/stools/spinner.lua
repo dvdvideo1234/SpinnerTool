@@ -24,7 +24,6 @@ local varEnableDT  = CreateConVar("sbox_en" ..gsSentName.."_timdbg", 0, gnVarFla
 local gsToolName   = gsSentName
 local gsToolNameU  = gsToolName.."_"
 local gsEntLimit   = gsSentName.."s"
-local gnMaxLin     = 1000
 local gnMaxAng     = 360
 local VEC_ZERO     = Vector()
 local ANG_ZERO     = Angle ()
@@ -45,9 +44,9 @@ if(SERVER) then
 
   cleanup.Register(gsEntLimit)
 
-  local function onRemove(self, down, up)
-    numpad.Remove(down)
-    numpad.Remove(up)
+  local function onRemove(self, fon, fof, ron, rof)
+    numpad.Remove(fon); numpad.Remove(fof)
+    numpad.Remove(ron); numpad.Remove(rof)
   end
 
   function newSpinner(oPly,vPos,aAng,stSpinner)
