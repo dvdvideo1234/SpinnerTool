@@ -264,11 +264,8 @@ end
 -- vA  >> Local vector of the spin axis
 -- vL  >> Local vector of the lever axis
 function TOOL:RecalculateUCS(vA, vL)
-  local cF = vA:Cross(vL)
-  local cL = cF:Cross(vA)
-  local cA = cL:Cross(cF)
-  cF:Normalize(); cL:Normalize(); cA:Normalize()
-  return cF, cL, cA
+  local cF, cL, cA = vA:Cross(vL), cF:Cross(vA), cL:Cross(cF)
+  cF:Normalize(); cL:Normalize(); cA:Normalize(); return cF, cL, cA
 end
 
 -- Updates direction of the spin axis and lever
@@ -513,21 +510,16 @@ function TOOL:DrawHUD()
             local xyFE = vFoe:ToScreen(); drawLineSpinner(xyFF, xyFE, "r")
           end; dAng:RotateAroundAxis(wvAxs, dA)
         end
-      elseif(cls == "prop_physics") then local vF, vL, vA, vPos
-        local daxs, dlev = self:GetDirectionID()
-        if(daxs == 0 and dlev == 0) then
-          vF, vL, vA = self:RecalculateUCS(stTr.HitNormal, ply:GetRight())
-          vPos = trEnt:LocalToWorld(trEnt:GetNWVector(gsSentHash.."_cen"))
-        else
-          local vMin, vMax = trEnt:GetRenderBounds()
-          vF, vL, vA = trEnt:GetForward(), trEnt:GetRight(), trEnt:GetUp()
-          vPos = trEnt:LocalToWorld((vMax + vMin) / 2)
-        end
+      elseif(cls == "prop_physics") then
+        local trCen, vMax = trEnt:GetRenderBounds()
+              trCen:Add(vMax); trCen:Mul(0.5)
+              trCen:Set(trEnt:LocalToWorld(trCen))
+        local vF, vL, vA = self:RecalculateUCS(self:GetVectors())
         local aAng = trEnt:GetAngles()
-        local xyO  = vPos:ToScreen()
-        local xyX  = (vPos + axs * vF):ToScreen()
-        local xyY  = (vPos + axs * vL):ToScreen()
-        local xyZ  = (vPos + axs * vA):ToScreen()
+        local xyO  = trCen:ToScreen()
+        local xyX  = (trCen + axs * vF):ToScreen()
+        local xyY  = (trCen + axs * vL):ToScreen()
+        local xyZ  = (trCen + axs * vA):ToScreen()
         drawLineSpinner(xyO, xyX, "r")
         drawLineSpinner(xyO, xyY, "g")
         drawLineSpinner(xyO, xyZ, "b")
