@@ -83,12 +83,12 @@ end
 
 if(SERVER) then
   -- Represents the arguments of ENT:BroadCast()
-  local tBroadCast = {
+  local gtBroadCast = {
     [1] = {"SetNWFloat", gsSentHash.."_power", 0},
     [2] = {"SetNWFloat", gsSentHash.."_lever", 0}
   }
   -- Used for rate array output
-  local tRateMap = {
+  local gtRateMap = {
     [1]  = {"bcTot", 1000},
     [2]  = {"bcTim", 1000},
     [3]  = {"eTick", 1000},
@@ -103,11 +103,10 @@ if(SERVER) then
   function ENT:GetRateMap()
     local tmRate = self[gsSentHash].Rate
     local mpTime = tmRate.mpTim
-    for ID = 1, #tRateMap do
-      local set = tRateMap[ID]
+    for ID = 1, #gtRateMap do
+      local set = gtRateMap[ID]
       mpTime[ID] = (tmRate[set[1]] * set[2])
-    end
-    return mpTime
+    end; return mpTime
   end
 
   function ENT:SetError(sMsg)
@@ -305,24 +304,25 @@ if(SERVER) then
     local tmRate = self[gsSentHash].Rate
     tmRate.thEnd = sysNow()
     if(not tmRate.isRdy) then tmRate.isRdy = true end
+    return self
   end
 
   function ENT:BroadCast(...)
     local tmRate = self[gsSentHash].Rate
     if(tmRate.bcTim <= 0) then
       local arList = {...}               -- Values stack for networking
-      for ID = 1, #tBroadCast do         -- Go trough all like a list
-        local set = tBroadCast[ID]       -- Get broadcaster setup
+      for ID = 1, #gtBroadCast do        -- Go trough all like a list
+        local set = gtBroadCast[ID]      -- Get broadcaster setup
         local val = arList[ID] or set[3] -- Take current or default when empty
         local foo, key = set[1], set[2]  -- Get the broadcast pair values
         self[foo](self, key, val)        -- Send to the client the value given
       end; tmRate.bcTim = tmRate.bcTot
-    end
+    end; return self
   end
 
   function ENT:Think()
     self:Tic()
-    local Pw, Le, wFr, wLe, wPw
+    local nPw, nLe, wFr, wLe, wPw
     local oSent = self[gsSentHash]
     local oPhys = self:GetPhysicsObject()
     if(oPhys and oPhys:IsValid()) then
@@ -337,14 +337,14 @@ if(SERVER) then
       if(oSent.On) then -- Disable toggling via numpad if wire is connected
         local vPwt, vLvt, eAng = oSent.PowT, oSent.LevT, self:GetAngles()
         local vLew, vAxw, aLev = oSent.LevW, oSent.AxiW, oSent.LAng
-        Le = (wLe and wLe or  oSent.Lever) -- Do not wipe internals in disconnect
-        Pw = (wPw and wPw or (oSent.Power * oSent.Dir))
+        nLe = (wLe and wLe or  oSent.Lever) -- Do not wipe internals in disconnect
+        nPw = (wPw and wPw or (oSent.Power * oSent.Dir))
         vAxw:Set(oSent.AxiL); vAxw:Rotate(eAng)
         vLew:Set(oSent.LevL); vLew:Rotate(eAng)
         aLev:Set(vLew:AngleEx(vAxw))
         for ID = 1, oSent.CLev do
           local vL, vF = aLev:Forward(), aLev:Right(); vF:Mul(-1)
-          oPhys:ApplyForceOffset(getPower(vPwt, vF, Pw), getLever(vLvt, vCn, vL, Le))
+          oPhys:ApplyForceOffset(getPower(vPwt, vF, nPw), getLever(vLvt, vCn, vL, nLe))
           aLev:RotateAroundAxis(vAxw, oSent.DAng)
         end
         if(WireLib) then -- Take the down-force into account ( if given )
@@ -357,7 +357,8 @@ if(SERVER) then
     else self:SetError("ENT.Think: Physics invalid"); end
     if(WireLib and oSent.IsTDB) then
       self:WriteWire("Rate", self:GetRateMap()) end
-    self:Toc(); self:BroadCast(wPw and wPw or oSent.Power, wLe and wLe or oSent.Lever); return true
+    nPw, nLe = (wPw and wPw or oSent.Power), (wLe and wLe or oSent.Lever)
+    self:BroadCast(nPw, nLe):Toc(); return true
   end
 
   local function spinForward(oPly, oEnt)
@@ -365,8 +366,9 @@ if(SERVER) then
     if(not (oEnt:GetClass() == gsSentHash)) then return end
     local oSent = oEnt[gsSentHash]
     if(oEnt:IsToggled()) then
-      if(oSent.On) then oSent.On, oSent.Dir = false, 0
-      else              oSent.On, oSent.Dir = true , 1 end
+      if(oSent.On) then
+           oSent.On, oSent.Dir = false, 0
+      else oSent.On, oSent.Dir = true , 1 end
     else
       oSent.On, oSent.Dir = true, 1
     end
@@ -377,8 +379,9 @@ if(SERVER) then
     if(not (oEnt:GetClass() == gsSentHash)) then return end
     local oSent = oEnt[gsSentHash]
     if(oEnt:IsToggled()) then
-      if(oSent.On) then oSent.On, oSent.Dir = false,  0
-      else              oSent.On, oSent.Dir = true , -1 end
+      if(oSent.On) then
+           oSent.On, oSent.Dir = false,  0
+      else oSent.On, oSent.Dir = true , -1 end
     else
       oSent.On, oSent.Dir = true, -1
     end
