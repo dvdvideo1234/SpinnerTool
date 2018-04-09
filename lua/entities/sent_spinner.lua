@@ -320,8 +320,7 @@ if(SERVER) then
     end; return self
   end
 
-  function ENT:Think()
-    self:Tic()
+  function ENT:Think() self:Tic()
     local nPw, nLe, wFr, wLe, wPw
     local oSent = self[gsSentHash]
     local oPhys = self:GetPhysicsObject()
@@ -366,7 +365,7 @@ if(SERVER) then
     if(not (oEnt:GetClass() == gsSentHash)) then return end
     local oSent = oEnt[gsSentHash]
     if(oEnt:IsToggled()) then
-      if(oSent.On) then
+      if(oSent.Dir ~= 0) then
            oSent.On, oSent.Dir = false, 0
       else oSent.On, oSent.Dir = true , 1 end
     else
@@ -379,7 +378,7 @@ if(SERVER) then
     if(not (oEnt:GetClass() == gsSentHash)) then return end
     local oSent = oEnt[gsSentHash]
     if(oEnt:IsToggled()) then
-      if(oSent.On) then
+      if(oSent.Dir ~= 0) then
            oSent.On, oSent.Dir = false,  0
       else oSent.On, oSent.Dir = true , -1 end
     else

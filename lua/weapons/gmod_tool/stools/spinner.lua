@@ -263,7 +263,9 @@ end
 -- vA  >> Local vector of the spin axis
 -- vL  >> Local vector of the lever axis
 function TOOL:RecalculateUCS(vA, vL)
-  local cF, cL, cA = vA:Cross(vL), cF:Cross(vA), cL:Cross(cF)
+  local cF = vA:Cross(vL)
+  local cL = cF:Cross(vA)
+  local cA = cL:Cross(cF)
   cF:Normalize(); cL:Normalize(); cA:Normalize(); return cF, cL, cA
 end
 
@@ -481,7 +483,18 @@ function TOOL:DrawHUD()
     local trEnt = stTr.Entity
     local axs   = self:GetDrawScale()
     local radc  = self:GetRadiusRatio(stTr, ply)
-    if(trEnt and trEnt:IsValid()) then
+    if(stTr.HitWorld) then
+      local trCen = stTr.HitPos
+      local xyO = trCen:ToScreen()
+      local vF, vL, vA = self:RecalculateUCS(stTr.HitNormal, ply:GetRight())
+      local xyX  = (trCen + axs * vF):ToScreen()
+      local xyY  = (trCen + axs * vL):ToScreen()
+      local xyZ  = (trCen + axs * vA):ToScreen()
+      drawLineSpinner(xyO, xyX, "r")
+      drawLineSpinner(xyO, xyY, "g")
+      drawLineSpinner(xyO, xyZ, "b")
+      drawCircleSpinner(xyO,radc,"y")
+    elseif(trEnt and trEnt:IsValid()) then
       local cls = trEnt:GetClass()
       if(cls == gsSentHash) then
         local trAng = trEnt:GetAngles()
@@ -508,12 +521,15 @@ function TOOL:DrawHUD()
           end; dAng:RotateAroundAxis(wvAxs, dA)
         end
       elseif(cls == "prop_physics") then
+        local aAng = trEnt:GetAngles()
         local trCen, vMax = trEnt:GetRenderBounds()
               trCen:Add(vMax); trCen:Mul(0.5)
               trCen:Set(trEnt:LocalToWorld(trCen))
-        local vF, vL, vA = self:RecalculateUCS(self:GetVectors())
-        local aAng = trEnt:GetAngles()
-        local xyO  = trCen:ToScreen()
+        local xyO, vF, vL, vA = trCen:ToScreen()
+        if(input.IsKeyDown(KEY_LALT)) then
+          vF, vL, vA = self:RecalculateUCS(self:GetVectors())
+          vF:Rotate(aAng); vL:Rotate(aAng); vA:Rotate(aAng)
+        else vF, vL, vA = self:RecalculateUCS(stTr.HitNormal, ply:GetRight()) end
         local xyX  = (trCen + axs * vF):ToScreen()
         local xyY  = (trCen + axs * vL):ToScreen()
         local xyZ  = (trCen + axs * vA):ToScreen()
@@ -605,4 +621,3 @@ function TOOL.BuildCPanel(CPanel)
   CPanel:CheckBox("Enable ghosting", gsToolNameU.."ghosting")
   CPanel:CheckBox("Enable adviser", gsToolNameU.."adviser")
 end
-

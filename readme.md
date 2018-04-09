@@ -1,6 +1,6 @@
 # Spinner tool entity ( Copyright 2016 ME )
 
-![SpinnerTool](https://raw.githubusercontent.com/dvdvideo1234/SpinnerTool/master/data/pictures/icon.jpg)
+![SpinnerTool](https://raw.githubusercontent.com/dvdvideo1234/SpinnerTool/master/data/pictures/screenshot.jpg)
 
 #### What does this thing do ?
 This entity defines a fidget spinner inside the game Garry's mod.
