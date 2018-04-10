@@ -11,7 +11,7 @@ to spin the physics model around.
 Do you remember when the spinner was such modern [thing](https://en.wikipedia.org/wiki/Fidget_spinner)?
 
 #### We already have motor and wheel tool, why did you this, seriously ?
-I made this SENT by request of a friend [Alex Chosen](steamcommunity.com/id/AlexChosen) and it fixes the following problems:
+I made this SENT by request of a friend [Alex Chosen](https://steamcommunity.com/id/AlexChosen) and it fixes the following problems:
 1. General motor tool persisting in Gmod has tendency to rotate in the opposite way when
 the car is faced south-north
 2. Wire motor tool has strange behavior when the motor is duped or the spinning part
