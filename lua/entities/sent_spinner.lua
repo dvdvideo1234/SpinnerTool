@@ -38,8 +38,13 @@ ENT.Spawnable       = false
 ENT.AdminSpawnable  = false
 
 local function getSign(nN)
-  return (nN / math.abs(nN))
-end
+  return (nN / math.abs(nN)) end
+
+local function getPower(vRes, vVec, nNum)
+  vRes:Set(vVec); vRes:Mul(nNum); return vRes end
+
+local function getLever(vRes, vPos, vVec, nNum)
+  vRes:Set(vVec); vRes:Mul(nNum); vRes:Add(vPos); return vRes end
 
 function ENT:GetPower()
   if(SERVER)     then local oSent = self[gsSentHash]; return oSent.Power
@@ -174,12 +179,6 @@ if(SERVER) then
       })
     end; return true
   end
-
-  local function getPower(vRes, vVec, nNum)
-    vRes:Set(vVec); vRes:Mul(nNum); return vRes end
-
-  local function getLever(vRes, vPos, vVec, nNum)
-    vRes:Set(vVec); vRes:Mul(nNum); vRes:Add(vPos); return vRes end
 
   function ENT:SetPhysRadius(nRad)
     local nRad = math.Clamp(tonumber(nRad) or 0, 0, varMaxRadius:GetFloat())
