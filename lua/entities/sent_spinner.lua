@@ -219,13 +219,11 @@ if(SERVER) then
 
   function ENT:SetTorqueLever(vDir, nCnt)
     local oSent = self[gsSentHash]
-    local nCnt  = (tonumber(nCnt) or 0)
-    if(nCnt <= 0) then
+    local nCnt  = (tonumber(nCnt) or 0); if(nCnt <= 0) then
       self:SetError("ENT.SetTorqueLever: Lever count invalid"); return false end
     if(vDir:Length() == 0) then
       self:SetError("ENT.SetTorqueLever: Force lever invalid"); return false end
-    oSent.CLev = nCnt
-    oSent.DAng = (360 / nCnt)
+    oSent.CLev, oSent.DAng = nCnt, (360 / nCnt)
     oSent.LevL:Set(vDir) -- Lever direction matched to player right
     oSent.ForL:Set(oSent.AxiL:Cross(oSent.LevL)) -- Force
     oSent.LevL:Set(oSent.ForL:Cross(oSent.AxiL)) -- Lever
@@ -236,7 +234,8 @@ if(SERVER) then
 
   function ENT:SetToggled(bTogg)
     local oSent = self[gsSentHash]; oSent.Togg = tobool(bTogg or false)
-    self:SetNWBool(gsSentHash.."_togg", oSent.Togg) end
+    self:SetNWBool(gsSentHash.."_togg", oSent.Togg)
+  end
 
   function ENT:ApplyTweaks()
     local oSent  = self[gsSentHash]
