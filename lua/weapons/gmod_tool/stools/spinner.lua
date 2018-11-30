@@ -116,7 +116,7 @@ end
 
 if(SERVER) then
 
-  CreateConVar("sbox_max"..gsEntLimit, 5, FCVAR_NOTIFY, "Maximum spinners to be spawned")
+  CreateConVar("sbox_max"..gsEntLimit, 10, FCVAR_NOTIFY, "Maximum spinners to be spawned")
 
   cleanup.Register(gsEntLimit)
 
@@ -611,7 +611,7 @@ local conVarList = TOOL:BuildConVarList()
 function TOOL.BuildCPanel(CPanel)
   local nMaxLine  = varMaxLine:GetFloat()
   local nMaxScale = varMaxScale:GetFloat()
-  local CurY, pItem = 0 -- pItem is the current panel created
+  local CurY, pItem, sTr = 0 -- pItem is the current panel created
           CPanel:SetName(getPhrase("tool."..gsToolName..".name"))
   pItem = CPanel:Help   (getPhrase("tool."..gsToolName..".desc"))
   CurY  = CurY + pItem:GetTall() + 2
@@ -622,39 +622,23 @@ function TOOL.BuildCPanel(CPanel)
               Options    = {["#Default"] = conVarList},
               CVars      = table.GetKeys(conVarList)})
   CurY  = CurY + pItem:GetTall() + 2
-
-  local pComboConst = CPanel:ComboBox(getPhrase("tool."..gsToolName..".constraint"), gsToolNameU.."constraint")
-        pComboConst:SetPos(2, CurY)
-        pComboConst:SetTall(20)
-        pComboConst:AddChoice(getPhrase("tool."..gsToolName..".constraint0"), 0)
-        pComboConst:AddChoice(getPhrase("tool."..gsToolName..".constraint1"), 1)
-        pComboConst:AddChoice(getPhrase("tool."..gsToolName..".constraint2"), 2)
-        pComboConst:AddChoice(getPhrase("tool."..gsToolName..".constraint3"), 3)
-        pComboConst:AddChoice(getPhrase("tool."..gsToolName..".constraint4"), 4)
+  
+  sTr = "tool."..gsToolName..".constraint"
+  local pComboConst = CPanel:ComboBox(getPhrase(sTr), gsToolNameU.."constraint")
+        pComboConst:SetPos(2, CurY); pComboConst:SetTall(20)
+        for iD = 0, 4 do pComboConst:AddChoice(getPhrase(sTr..iD), iD) end
   CurY = CurY + pComboConst:GetTall() + 2
-
-  local pComboAxis = CPanel:ComboBox(getPhrase("tool."..gsToolName..".diraxis"), gsToolNameU.."diraxis")
-        pComboAxis:SetPos(2, CurY)
-        pComboAxis:SetTall(20)
-        pComboAxis:AddChoice(getPhrase("tool."..gsToolName..".diraxis0"), 0)
-        pComboAxis:AddChoice(getPhrase("tool."..gsToolName..".diraxis1"), 1)
-        pComboAxis:AddChoice(getPhrase("tool."..gsToolName..".diraxis2"), 2)
-        pComboAxis:AddChoice(getPhrase("tool."..gsToolName..".diraxis3"), 3)
-        pComboAxis:AddChoice(getPhrase("tool."..gsToolName..".diraxis4"), 4)
-        pComboAxis:AddChoice(getPhrase("tool."..gsToolName..".diraxis5"), 5)
-        pComboAxis:AddChoice(getPhrase("tool."..gsToolName..".diraxis6"), 6)
+  
+  sTr = "tool."..gsToolName..".diraxis"
+  local pComboAxis = CPanel:ComboBox(getPhrase(sTr), gsToolNameU.."diraxis")
+        pComboAxis:SetPos(2, CurY); pComboAxis:SetTall(20)
+        for iD = 0, 6 do pComboAxis:AddChoice(getPhrase(sTr..iD), iD) end
   CurY = CurY + pComboAxis:GetTall() + 2
 
-  local pComboLever = CPanel:ComboBox(getPhrase("tool."..gsToolName..".dirlever"), gsToolNameU.."dirlever")
-        pComboLever:SetPos(2, CurY)
-        pComboLever:SetTall(20)
-        pComboLever:AddChoice(getPhrase("tool."..gsToolName..".dirlever0"), 0)
-        pComboLever:AddChoice(getPhrase("tool."..gsToolName..".dirlever1"), 1)
-        pComboLever:AddChoice(getPhrase("tool."..gsToolName..".dirlever2"), 2)
-        pComboLever:AddChoice(getPhrase("tool."..gsToolName..".dirlever3"), 3)
-        pComboLever:AddChoice(getPhrase("tool."..gsToolName..".dirlever4"), 4)
-        pComboLever:AddChoice(getPhrase("tool."..gsToolName..".dirlever5"), 5)
-        pComboLever:AddChoice(getPhrase("tool."..gsToolName..".dirlever6"), 6)
+  sTr = "tool."..gsToolName..".dirlever"
+  local pComboLever = CPanel:ComboBox(getPhrase(sTr), gsToolNameU.."dirlever")
+        pComboLever:SetPos(2, CurY); pComboLever:SetTall(20)
+        for iD = 0, 6 do pComboLever:AddChoice(getPhrase(sTr..iD), iD) end
   CurY = CurY + pComboLever:GetTall() + 2
 
   CPanel:AddControl( "Numpad", {  Label = getPhrase("tool."..gsToolName..".keyfwd"),
