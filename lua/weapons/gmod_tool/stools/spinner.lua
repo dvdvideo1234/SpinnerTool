@@ -100,10 +100,13 @@ local function setTranslate(sT)  -- Override translations file
   gtLang["tool."..gsToolName..".nocollide"  ] = "NoCollide with trace"
   gtLang["tool."..gsToolName..".ghosting"   ] = "Enable ghosting"
   gtLang["tool."..gsToolName..".adviser"    ] = "Enable adviser"
+  gtLang["Cleanup_"..gsEntLimit             ] = "Spinners"
+  gtLang["Cleaned_"..gsEntLimit             ] = "All spinners are cleared!"
+  gtLang["SBoxLimit_"..gsEntLimit           ] = "You've hit the limit for created spinners!"
   local sT = tostring(sT or ""); if(sT ~= "en") then
     local fT = CompileFile(("%s/lang/%s.lua"):format(gsToolName, sT))
     local bF, fFo = pcall(fT); if(bF) then
-      local bS, tTo = pcall(fFo, gsToolName); if(bS) then
+      local bS, tTo = pcall(fFo, gsToolName, gsEntLimit); if(bS) then
         for key, val in pairs(gtLang) do gtLang[key] = (tTo[key] or gtLang[key]) end
       else ErrorNoHalt(gsToolName..": setTranslate("..sT.."): "..tostring(tTo)) end
     else ErrorNoHalt(gsToolName..": setTranslate("..sT.."): "..tostring(fFo)) end
@@ -224,14 +227,17 @@ local function GetDirectionID(nID)
   return gtDirectionID[(tonumber(nID) or 0)] or Vector()
 end
 
-function TOOL:GetDeviation()
+function TOOL:GetDeviationPos()
   local nMaxLine = varMaxLine:GetFloat()
-  return Vector(math.Clamp(self:GetClientNumber("linx"),-nMaxLine,nMaxLine),
-                math.Clamp(self:GetClientNumber("liny"),-nMaxLine,nMaxLine),
-                math.Clamp(self:GetClientNumber("linz"),-nMaxLine,nMaxLine)),
-         Angle (math.Clamp(self:GetClientNumber("angp"),-gnMaxAng,gnMaxAng),
-                math.Clamp(self:GetClientNumber("angy"),-gnMaxAng,gnMaxAng),
-                math.Clamp(self:GetClientNumber("angr"),-gnMaxAng,gnMaxAng))
+  return math.Clamp(self:GetClientNumber("linx"),-nMaxLine,nMaxLine),
+         math.Clamp(self:GetClientNumber("liny"),-nMaxLine,nMaxLine),
+         math.Clamp(self:GetClientNumber("linz"),-nMaxLine,nMaxLine)
+end
+
+function TOOL:GetDeviationAng()
+  return math.Clamp(self:GetClientNumber("angp"),-gnMaxAng,gnMaxAng),
+         math.Clamp(self:GetClientNumber("angy"),-gnMaxAng,gnMaxAng),
+         math.Clamp(self:GetClientNumber("angr"),-gnMaxAng,gnMaxAng)
 end
 
 function TOOL:GetCustomAxis()
@@ -353,18 +359,19 @@ end
 -- Returns the hit-normal spawn position and orientation
 function TOOL:ApplySpawn(oEnt, stTrace)
   if(not (oEnt and oEnt:IsValid())) then return false end
-  if(not stTrace.Hit) then oEnt:Remove() return false end
-  local oPos, oAng   = self:GetDeviation()
-  local oPly, trNorm = self:GetOwner(), stTrace.HitNormal
-  local vPos, aAng, lAxs, lLev = Vector(), Angle(), self:GetVectors()
-  local lAng, vOBB = (lAxs:Cross(lLev):AngleEx(lAxs)), oEnt:OBBMins()
-  aAng:Set(oEnt:AlignAngles(oEnt:LocalToWorldAngles(lAng + oAng),
-           trNorm:Cross(oPly:GetRight()):AngleEx(trNorm)))
-  vPos:Set(stTrace.HitPos);
-  vPos:Add((math.abs(vOBB:Dot(lAxs))) * trNorm)
-  vPos:Add(oPos.x * aAng:Forward())
-  vPos:Add(oPos.y * aAng:Right())
-  vPos:Add(oPos.z * aAng:Up())
+  if(not stTrace.Hit) then oEnt:Remove() return false end 
+  local oPly, vOBB = self:GetOwner(), oEnt:OBBMins()
+  local linx, liny, linz = self:GetDeviationPos()
+  local angp, angy, angr = self:GetDeviationAng()
+  local vU, vR = stTrace.HitNormal, oPly:GetRight()
+  local vF, vA, vL = vU:Cross(vR), self:GetVectors()
+  local vPos, aAng = Vector(), Angle() 
+  local lA = (vA:Cross(vL):AngleEx(vA))
+  aAng:Set(oEnt:AlignAngles(oEnt:LocalToWorldAngles(lA), vU:Cross(vR):AngleEx(vU)))
+  vPos:Set(stTrace.HitPos); vPos:Add((math.abs(vOBB:Dot(vA))) * vU) 
+  aAng:RotateAroundAxis(vU,  angy); vPos:Add(linz * vU)
+  aAng:RotateAroundAxis(vR, -angp); vPos:Add(liny * vR)
+  aAng:RotateAroundAxis(vF,  angr); vPos:Add(linx * vF)
   aAng:Normalize(); oEnt:SetPos(vPos); oEnt:SetAngles(aAng); return true
 end
 
@@ -402,8 +409,8 @@ function TOOL:Constraint(eSpin, stTrace)
 end
 
 function TOOL:NotifyUser(oPly, sMsg, sTyp, nSiz)
-  ply:SendLua("GAMEMODE:AddNotify(\""..sTyp.."\", NOTIFY_"..sTyp..", "..nSiz..")")
-  ply:SendLua("surface.PlaySound(\"ambient/water/drip"..math.random(1, 4)..".wav\")")
+  oPly:SendLua("GAMEMODE:AddNotify(\""..sMsg.."\", NOTIFY_"..sTyp..", "..nSiz..")")
+  oPly:SendLua("surface.PlaySound(\"ambient/water/drip"..math.random(1, 4)..".wav\")")
 end
 
 function TOOL:LeftClick(stTrace)
@@ -673,9 +680,9 @@ end
 
 -- listen for changes to the localify language and reload the tool's menu to update the localizations
 if(CLIENT) then
-  cvars.RemoveChangeCallback(varLng:GetName(), gsLisp.."lang")
+  cvars.RemoveChangeCallback(varLng:GetName(), gsToolNameU.."lang")
   cvars.AddChangeCallback(varLng:GetName(), function(sNam, vO, vN) setTranslate(vN)
     local cPanel = controlpanel.Get(goTool.Mode); if(not IsValid(cPanel)) then return end
     cPanel:ClearControls(); goTool.BuildCPanel(cPanel)
-  end, gsLisp.."lang")
+  end, gsToolNameU.."lang")
 end
