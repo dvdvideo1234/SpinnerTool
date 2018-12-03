@@ -114,7 +114,10 @@ local function setTranslate(sT)  -- Override translations file
 end
 
 local function getPhrase(sK)
-  return (gtLang[tostring(sK)] or "Oops, missing ?")
+  local sK = tostring(sK) if(not gtLang[sK]) then
+    ErrorNoHalt(gsToolName..": getPhrase("..sK.."): Missing")
+    return "Oops, missing ?" -- Return some default translation
+  end; return gtLang[sK]
 end
 
 if(SERVER) then
@@ -553,15 +556,15 @@ function TOOL:DrawHUD()
     local stTr  = ply:GetEyeTrace()
     if(not stTr) then return end
     local trEnt = stTr.Entity
-    local axs   = self:GetDrawScale()
+    local axis  = self:GetDrawScale()
     local radc  = self:GetRadiusRatio(stTr, ply)
     if(stTr.HitWorld) then
       local trCen = stTr.HitPos
       local xyO = trCen:ToScreen()
       local vF, vL, vA = self:RecalculateUCS(stTr.HitNormal, ply:GetRight())
-      local xyX  = (trCen + axs * vF):ToScreen()
-      local xyY  = (trCen + axs * vL):ToScreen()
-      local xyZ  = (trCen + axs * vA):ToScreen()
+      local xyX  = (trCen + axis * vF):ToScreen()
+      local xyY  = (trCen + axis * vL):ToScreen()
+      local xyZ  = (trCen + axis * vA):ToScreen()
       drawLineSpinner(xyO, xyX, "r")
       drawLineSpinner(xyO, xyY, "g")
       drawLineSpinner(xyO, xyZ, "b")
@@ -572,14 +575,14 @@ function TOOL:DrawHUD()
         local trAng = trEnt:GetAngles()
         local trCen = trEnt:LocalToWorld(trEnt:GetSpinCenter())
         local nP, nL = trEnt:GetPower(), trEnt:GetLever()
-        local nF, nE = axs * (nP / varMaxScale:GetFloat()), axs * (nP / math.abs(nP))
+        local nF, nE = axis * (nP / varMaxScale:GetFloat()), axis * (nP / math.abs(nP))
         local spCnt = trEnt:GetLeverCount()
         local spAxs = trEnt:GetTorqueAxis()
         local spLev = trEnt:GetTorqueLever()
         local wvAxs = Vector(); wvAxs:Set(spAxs); wvAxs:Rotate(trAng)
         local wvLev = Vector(); wvLev:Set(spLev); wvLev:Rotate(trAng)
         local dAng, dA = wvLev:AngleEx(wvAxs), (360 / spCnt)
-        local xyOO, xyOA = trCen:ToScreen(), (axs * wvAxs + trCen):ToScreen()
+        local xyOO, xyOA = trCen:ToScreen(), (axis * wvAxs + trCen):ToScreen()
         drawLineSpinner(xyOO, xyOA, "b")
         drawCircleSpinner(xyOO, radc, "y")
         for ID = 1, spCnt do
@@ -602,9 +605,9 @@ function TOOL:DrawHUD()
           vF, vL, vA = self:RecalculateUCS(self:GetVectors())
           vF:Rotate(aAng); vL:Rotate(aAng); vA:Rotate(aAng)
         else vF, vL, vA = self:RecalculateUCS(stTr.HitNormal, ply:GetRight()) end
-        local xyX  = (trCen + axs * vF):ToScreen()
-        local xyY  = (trCen + axs * vL):ToScreen()
-        local xyZ  = (trCen + axs * vA):ToScreen()
+        local xyX  = (trCen + axis * vF):ToScreen()
+        local xyY  = (trCen + axis * vL):ToScreen()
+        local xyZ  = (trCen + axis * vA):ToScreen()
         drawLineSpinner(xyO, xyX, "r")
         drawLineSpinner(xyO, xyY, "g")
         drawLineSpinner(xyO, xyZ, "b")

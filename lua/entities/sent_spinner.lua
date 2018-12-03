@@ -182,10 +182,10 @@ if(SERVER) then
 
   function ENT:SetPhysRadius(nRad)
     local nRad = math.Clamp(tonumber(nRad) or 0, 0, varMaxRadius:GetFloat())
-    if(nRad > 0) then
-      local oSent = self[gsSentHash]
-      local vMin  = Vector(-nRad,-nRad,-nRad)
-      local vMax  = Vector( nRad, nRad, nRad)
+    if(nRad > 0) then local oSent = self[gsSentHash]
+      local vCen = self:OBBCenter()
+      local vMin = Vector(-nRad,-nRad,-nRad); vMin:Add(vCen)
+      local vMax = Vector( nRad, nRad, nRad); vMax:Add(vCen)
       self:PhysicsInitSphere(nRad)
       self:SetCollisionBounds(vMin, vMax)
       self:PhysWake(); oSent.Radi = nRad
