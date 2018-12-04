@@ -8,6 +8,7 @@
  * Defines  : Spinner manager script
 ]]--
 local gsSentHash   = "sent_spinner"
+local varLng       = GetConVar("gmod_language")
 local gsSentName   = gsSentHash:gsub("sent_","")
 local gnVarFlags   = bit.bor(FCVAR_ARCHIVE, FCVAR_ARCHIVE_XBOX, FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_PRINTABLEONLY)
 local varMaxDirOfs = CreateConVar("sbox_max"..gsSentName.."_drofs" , 2000, gnVarFlags, "Maximum direction offset to overcome displacing unit vectors")
@@ -16,7 +17,7 @@ local varMaxMass   = CreateConVar("sbox_max"..gsSentName.."_mass"  , 50000, gnVa
 local varMaxRadius = CreateConVar("sbox_max"..gsSentName.."_radius", 1000, gnVarFlags, "Maximum radius when rebuilding the collision model as sphere")
 local varMaxLine   = CreateConVar("sbox_max"..gsSentName.."_line"  , 1000, gnVarFlags, "Maximum linear offset for general stuff and panel handling")
 local varBroadCast = CreateConVar("sbox_max"..gsSentName.."_broad" , 250, gnVarFlags, "Maximum time [ms] when reached the think method sends client stuff")
-local varTickRate  = CreateConVar("sbox_max"..gsSentName.."_tick"  , 20, gnVarFlags, "Maximum sampling time [ms] when the spinner is activated. Be careful!")
+local varTickRate  = CreateConVar("sbox_max"..gsSentName.."_tick"  , 10, gnVarFlags, "Maximum sampling time [ms] when the spinner is activated. Be careful!")
 local varRemoveER  = CreateConVar("sbox_en" ..gsSentName.."_remerr", 1, gnVarFlags, "When enabled removes the spinner when an error is present")
 local varEnableWT  = CreateConVar("sbox_en" ..gsSentName.."_wdterr", 1, gnVarFlags, "When enabled takes the watchdog timer for an actual error")
 local varEnableDT  = CreateConVar("sbox_en" ..gsSentName.."_timdbg", 0, gnVarFlags, "When enabled outputs the rate status on the wire output")
@@ -27,6 +28,8 @@ local gsEntLimit   = gsSentName.."s"
 local gnMaxAng     = 360
 local VEC_ZERO     = Vector()
 local ANG_ZERO     = Angle ()
+local goTool       = TOOL
+local gtLang       = {}
 local gtPalette    = {}
       gtPalette["w"]  = Color(255,255,255,255)
       gtPalette["r"]  = Color(255, 0 , 0 ,255)
@@ -37,10 +40,89 @@ local gtPalette    = {}
       gtPalette["y"]  = Color(255,255, 0 ,255)
       gtPalette["c"]  = Color( 0 ,255,255,255)
       gtPalette["gh"] = Color(255,255,255,200)
+local gtDirectionID = {}
+      gtDirectionID[1] = Vector( 1, 0, 0)
+      gtDirectionID[2] = Vector( 0, 1, 0)
+      gtDirectionID[3] = Vector( 0, 0, 1)
+      gtDirectionID[4] = Vector(-1, 0, 0)
+      gtDirectionID[5] = Vector( 0,-1, 0)
+      gtDirectionID[6] = Vector( 0, 0,-1)
+
+local function setTranslate(sT)  -- Override translations file
+  gtLang["tool."..gsToolName..".name"       ] = "Spinner tool"
+  gtLang["tool."..gsToolName..".desc"       ] = "Creates/Updates a spinner entity"
+  gtLang["tool."..gsToolName..".left"       ] = "Create/Update spinner"
+  gtLang["tool."..gsToolName..".left_use"   ] = "Create/Update spinner"
+  gtLang["tool."..gsToolName..".right"      ] = "Copy settings"
+  gtLang["tool."..gsToolName..".right_use"  ] = "Copy settings"
+  gtLang["tool."..gsToolName..".reload"     ] = "Remove spinner"
+  gtLang["tool."..gsToolName..".constraint" ] = "Constraint type"
+  gtLang["tool."..gsToolName..".constraint0"] = "Skip linking"
+  gtLang["tool."..gsToolName..".constraint1"] = "Weld spinner"
+  gtLang["tool."..gsToolName..".constraint2"] = "Axis normal"
+  gtLang["tool."..gsToolName..".constraint3"] = "Ball spinner"
+  gtLang["tool."..gsToolName..".constraint4"] = "Ball trace"
+  gtLang["tool."..gsToolName..".diraxis"    ] = "Axis direction"
+  gtLang["tool."..gsToolName..".diraxis0"   ] = "<Custom>"
+  gtLang["tool."..gsToolName..".diraxis1"   ] = "+X Red"
+  gtLang["tool."..gsToolName..".diraxis2"   ] = "+Y Green"
+  gtLang["tool."..gsToolName..".diraxis3"   ] = "+Z Blue"
+  gtLang["tool."..gsToolName..".diraxis4"   ] = "-X Red"
+  gtLang["tool."..gsToolName..".diraxis5"   ] = "-Y Green"
+  gtLang["tool."..gsToolName..".diraxis6"   ] = "-Z Blue"
+  gtLang["tool."..gsToolName..".dirlever"   ] = "Lever direction"
+  gtLang["tool."..gsToolName..".dirlever0"  ] = "<Custom>"
+  gtLang["tool."..gsToolName..".dirlever1"  ] = "+X Red"
+  gtLang["tool."..gsToolName..".dirlever2"  ] = "+Y Green"
+  gtLang["tool."..gsToolName..".dirlever3"  ] = "+Z Blue"
+  gtLang["tool."..gsToolName..".dirlever4"  ] = "-X Red"
+  gtLang["tool."..gsToolName..".dirlever5"  ] = "-Y Green"
+  gtLang["tool."..gsToolName..".dirlever6"  ] = "-Z Blue"
+  gtLang["tool."..gsToolName..".keyfwd"     ] = "Key Forward:"
+  gtLang["tool."..gsToolName..".keyrev"     ] = "Key Reverse:"
+  gtLang["tool."..gsToolName..".mass"       ] = "Mass: "
+  gtLang["tool."..gsToolName..".power"      ] = "Power: "
+  gtLang["tool."..gsToolName..".friction"   ] = "Friction: "
+  gtLang["tool."..gsToolName..".forcelim"   ] = "Force limit: "
+  gtLang["tool."..gsToolName..".torqulim"   ] = "Torque limit: "
+  gtLang["tool."..gsToolName..".lever"      ] = "Lever length: "
+  gtLang["tool."..gsToolName..".levercnt"   ] = "Lever count: "
+  gtLang["tool."..gsToolName..".radius"     ] = "Sphere radius: "
+  gtLang["tool."..gsToolName..".resetoffs"  ] = "V Reset offsets V"
+  gtLang["tool."..gsToolName..".linx"       ] = "Offset X: "
+  gtLang["tool."..gsToolName..".liny"       ] = "Offset Y: "
+  gtLang["tool."..gsToolName..".linz"       ] = "Offset Z: "
+  gtLang["tool."..gsToolName..".angp"       ] = "Offset pitch: "
+  gtLang["tool."..gsToolName..".angy"       ] = "Offset yaw: "
+  gtLang["tool."..gsToolName..".angr"       ] = "Offset roll: "
+  gtLang["tool."..gsToolName..".drwscale"   ] = "Draw scale: "
+  gtLang["tool."..gsToolName..".toggle"     ] = "Toggle"
+  gtLang["tool."..gsToolName..".nocollide"  ] = "NoCollide with trace"
+  gtLang["tool."..gsToolName..".ghosting"   ] = "Enable ghosting"
+  gtLang["tool."..gsToolName..".adviser"    ] = "Enable adviser"
+  gtLang["Cleanup_"..gsEntLimit             ] = "Spinners"
+  gtLang["Cleaned_"..gsEntLimit             ] = "All spinners are cleared!"
+  gtLang["SBoxLimit_"..gsEntLimit           ] = "You've hit the limit for created spinners!"
+  local sT = tostring(sT or ""); if(sT ~= "en") then
+    local fT = CompileFile(("%s/lang/%s.lua"):format(gsToolName, sT))
+    local bF, fFo = pcall(fT); if(bF) then
+      local bS, tTo = pcall(fFo, gsToolName, gsEntLimit); if(bS) then
+        for key, val in pairs(gtLang) do gtLang[key] = (tTo[key] or gtLang[key]) end
+      else ErrorNoHalt(gsToolName..": setTranslate("..sT.."): "..tostring(tTo)) end
+    else ErrorNoHalt(gsToolName..": setTranslate("..sT.."): "..tostring(fFo)) end
+  end; for key, val in pairs(gtLang) do language.Add(key, val) end
+end
+
+local function getPhrase(sK)
+  local sK = tostring(sK) if(not gtLang[sK]) then
+    ErrorNoHalt(gsToolName..": getPhrase("..sK.."): Missing")
+    return "Oops, missing ?" -- Return some default translation
+  end; return gtLang[sK]
+end
 
 if(SERVER) then
 
-  CreateConVar("sbox_max"..gsEntLimit, 5, FCVAR_NOTIFY, "Maximum spinners to be spawned")
+  CreateConVar("sbox_max"..gsEntLimit, 10, FCVAR_NOTIFY, "Maximum spinners to be spawned")
 
   cleanup.Register(gsEntLimit)
 
@@ -82,18 +164,14 @@ if(SERVER) then
 end
 
 if(CLIENT) then
+  language.Add("tool."..gsToolName..".category" , "Construction")
   TOOL.Information = {
     { name = "info",  stage = 1   },
     { name = "left"         },
     { name = "right"        },
     { name = "reload"       }
   }
-  language.Add("tool."..gsToolName..".left"     , "Create/Update spinner")
-  language.Add("tool."..gsToolName..".right"    , "Copy settings")
-  language.Add("tool."..gsToolName..".reload"   , "Remove spinner")
-  language.Add("tool."..gsToolName..".category" , "Construction")
-  language.Add("tool."..gsToolName..".name"     , "Spinner tool")
-  language.Add("tool."..gsToolName..".desc"     , "Creates/updates a spinner entity")
+  setTranslate(varLng:GetString())
   concommand.Add(gsToolNameU.."resetoffs", function(oPly,oCom,oArgs)
     oPly:ConCommand(gsToolNameU.."linx 0\n")
     oPly:ConCommand(gsToolNameU.."liny 0\n")
@@ -110,31 +188,31 @@ TOOL.Command    = nil -- Command on click (nil for default)
 TOOL.ConfigName = nil -- Configure file name (nil for default)
 
 TOOL.ClientConVar = {
-  ["mass"      ] = "300",     -- Spinner entity mass when created
-  ["linx"      ] = "0",       -- Linear user deviation X
-  ["liny"      ] = "0",       -- Linear user deviation Y
-  ["linz"      ] = "0",       -- Linear user deviation Z
-  ["angp"      ] = "0",       -- Angle user deviation pitch
-  ["angy"      ] = "0",       -- Angle user deviation yaw
-  ["angr"      ] = "0",       -- Angle user deviation roll
-  ["ghosting"  ] = "1",       -- Draws the ghosted prop of the spinner when enabled
+  ["mass"      ] = 300,     -- Spinner entity mass when created
+  ["linx"      ] = 0,       -- Linear user deviation X
+  ["liny"      ] = 0,       -- Linear user deviation Y
+  ["linz"      ] = 0,       -- Linear user deviation Z
+  ["angp"      ] = 0,       -- Angle user deviation pitch
+  ["angy"      ] = 0,       -- Angle user deviation yaw
+  ["angr"      ] = 0,       -- Angle user deviation roll
+  ["ghosting"  ] = 1,       -- Draws the ghosted prop of the spinner when enabled
   ["model"     ] = "models/props_trainstation/trainstation_clock001.mdl", -- Spinner entity model
-  ["friction"  ] = "0",       -- Friction for the constraints linking spinner to trace ( if available )
-  ["forcelim"  ] = "0",       -- Force limit on for the constraints linking spinner to trace ( if available )
-  ["torqulim"  ] = "0",       -- Torque limit on for the constraints linking spinner to trace ( if available )
-  ["keyfwd"    ] = "45",      -- Key to spin forward ( to the force ref direction )
-  ["keyrev"    ] = "39",      -- Key to spin in reverse
-  ["lever"     ] = "10",      -- Defines how long each lever of the entity is
-  ["levercnt"  ] = "2",       -- Defines how many force levers the entity created has
-  ["drwscale"  ] = "30",      -- How long is the scaled force line
-  ["power"     ] = "100",     -- Power of the spinner the bigger the faster
-  ["radius"    ] = "0",       -- Radius if bigger than zero circular collision is used
-  ["toggle"    ] = "0",       -- Remain in a spinning state when the numpad is released
-  ["diraxis"   ] = "0",       -- Axis  direction ID matched to /pComboAxis/
-  ["dirlever"  ] = "0",       -- Lever direction ID matched to /pComboLever/
-  ["adviser"   ] = "1",       -- Enabled drawing the coordinates of the props or spinner parameters
-  ["nocollide" ] = "0",       -- Enabled creates a no-collision constraint between it and the trace
-  ["constraint"] = "0",       -- Constraint type matched to /pComboConst/
+  ["friction"  ] = 0,       -- Friction for the constraints linking spinner to trace ( if available )
+  ["forcelim"  ] = 0,       -- Force limit on for the constraints linking spinner to trace ( if available )
+  ["torqulim"  ] = 0,       -- Torque limit on for the constraints linking spinner to trace ( if available )
+  ["keyfwd"    ] = 45,      -- Key to spin forward ( to the force ref direction )
+  ["keyrev"    ] = 39,      -- Key to spin in reverse
+  ["lever"     ] = 10,      -- Defines how long each lever of the entity is
+  ["levercnt"  ] = 2,       -- Defines how many force levers the entity created has
+  ["drwscale"  ] = 30,      -- How long is the scaled force line
+  ["power"     ] = 100,     -- Power of the spinner the bigger the faster
+  ["radius"    ] = 0,       -- Radius if bigger than zero circular collision is used
+  ["toggle"    ] = 0,       -- Remain in a spinning state when the numpad is released
+  ["diraxis"   ] = 0,       -- Axis  direction ID matched to /pComboAxis/
+  ["dirlever"  ] = 0,       -- Lever direction ID matched to /pComboLever/
+  ["adviser"   ] = 1,       -- Enabled drawing the coordinates of the props or spinner parameters
+  ["nocollide" ] = 0,       -- Enabled creates a no-collision constraint between it and the trace
+  ["constraint"] = 0,       -- Constraint type matched to /pComboConst/
   ["cusaxis"   ] = "[0,0,0]", -- Local custom spin axis vector
   ["cuslever"  ] = "[0,0,0]"  -- Local custom leverage vector
 }
@@ -148,26 +226,21 @@ local function strVector(vV)
   return "["..tostring(vV.x or 0)..","..tostring(vV.y or 0)..","..tostring(vV.z or 0).."]"
 end
 
-local gtDirectionID = {}
-      gtDirectionID[1] = Vector( 1, 0, 0)
-      gtDirectionID[2] = Vector( 0, 1, 0)
-      gtDirectionID[3] = Vector( 0, 0, 1)
-      gtDirectionID[4] = Vector(-1, 0, 0)
-      gtDirectionID[5] = Vector( 0,-1, 0)
-      gtDirectionID[6] = Vector( 0, 0,-1)
-
 local function GetDirectionID(nID)
   return gtDirectionID[(tonumber(nID) or 0)] or Vector()
 end
 
-function TOOL:GetDeviation()
+function TOOL:GetDeviationPos()
   local nMaxLine = varMaxLine:GetFloat()
-  return Vector(math.Clamp(self:GetClientNumber("linx"),-nMaxLine,nMaxLine),
-                math.Clamp(self:GetClientNumber("liny"),-nMaxLine,nMaxLine),
-                math.Clamp(self:GetClientNumber("linz"),-nMaxLine,nMaxLine)),
-         Angle (math.Clamp(self:GetClientNumber("angp"),-gnMaxAng,gnMaxAng),
-                math.Clamp(self:GetClientNumber("angy"),-gnMaxAng,gnMaxAng),
-                math.Clamp(self:GetClientNumber("angr"),-gnMaxAng,gnMaxAng))
+  return math.Clamp(self:GetClientNumber("linx"),-nMaxLine,nMaxLine),
+         math.Clamp(self:GetClientNumber("liny"),-nMaxLine,nMaxLine),
+         math.Clamp(self:GetClientNumber("linz"),-nMaxLine,nMaxLine)
+end
+
+function TOOL:GetDeviationAng()
+  return math.Clamp(self:GetClientNumber("angp"),-gnMaxAng,gnMaxAng),
+         math.Clamp(self:GetClientNumber("angy"),-gnMaxAng,gnMaxAng),
+         math.Clamp(self:GetClientNumber("angr"),-gnMaxAng,gnMaxAng)
 end
 
 function TOOL:GetCustomAxis()
@@ -260,8 +333,8 @@ end
 
 -- Recalculates the orientation based on the spin axis and lever axis
 -- Updates force, lever and spin axises to be orthogonal to each other
--- vA  >> Local vector of the spin axis
--- vL  >> Local vector of the lever axis
+-- vA > Local vector of the spin axis
+-- vL > Local vector of the lever axis
 function TOOL:RecalculateUCS(vA, vL)
   local cF = vA:Cross(vL)
   local cL = cF:Cross(vA)
@@ -289,18 +362,19 @@ end
 -- Returns the hit-normal spawn position and orientation
 function TOOL:ApplySpawn(oEnt, stTrace)
   if(not (oEnt and oEnt:IsValid())) then return false end
-  if(not stTrace.Hit) then oEnt:Remove() return false end
-  local oPos, oAng   = self:GetDeviation()
-  local oPly, trNorm = self:GetOwner(), stTrace.HitNormal
-  local vPos, aAng, lAxs, lLev = Vector(), Angle(), self:GetVectors()
-  local lAng, vOBB = (lAxs:Cross(lLev):AngleEx(lAxs)), oEnt:OBBMins()
-  aAng:Set(oEnt:AlignAngles(oEnt:LocalToWorldAngles(lAng + oAng),
-           trNorm:Cross(oPly:GetRight()):AngleEx(trNorm)))
-  vPos:Set(stTrace.HitPos);
-  vPos:Add((math.abs(vOBB:Dot(lAxs))) * trNorm)
-  vPos:Add(oPos.x * aAng:Forward())
-  vPos:Add(oPos.y * aAng:Right())
-  vPos:Add(oPos.z * aAng:Up())
+  if(not stTrace.Hit) then oEnt:Remove() return false end 
+  local oPly, vOBB = self:GetOwner(), oEnt:OBBMins()
+  local linx, liny, linz = self:GetDeviationPos()
+  local angp, angy, angr = self:GetDeviationAng()
+  local vU, vR = stTrace.HitNormal, oPly:GetRight()
+  local vF, vA, vL = vU:Cross(vR), self:GetVectors()
+  local vPos, aAng = Vector(), Angle() 
+  local lA = (vA:Cross(vL):AngleEx(vA))
+  aAng:Set(oEnt:AlignAngles(oEnt:LocalToWorldAngles(lA), vU:Cross(vR):AngleEx(vU)))
+  vPos:Set(stTrace.HitPos); vPos:Add((math.abs(vOBB:Dot(vA))) * vU) 
+  aAng:RotateAroundAxis(vU,  angy); vPos:Add(linz * vU)
+  aAng:RotateAroundAxis(vR, -angp); vPos:Add(liny * vR)
+  aAng:RotateAroundAxis(vF,  angr); vPos:Add(linx * vF)
   aAng:Normalize(); oEnt:SetPos(vPos); oEnt:SetAngles(aAng); return true
 end
 
@@ -335,6 +409,11 @@ function TOOL:Constraint(eSpin, stTrace)
       if(C) then eSpin:DeleteOnRemove(C); trEnt:DeleteOnRemove(C); return C end
     else return false end
   end; return false
+end
+
+function TOOL:NotifyUser(oPly, sMsg, sTyp, nSiz)
+  oPly:SendLua("GAMEMODE:AddNotify(\""..sMsg.."\", NOTIFY_"..sTyp..", "..nSiz..")")
+  oPly:SendLua("surface.PlaySound(\"ambient/water/drip"..math.random(1, 4)..".wav\")")
 end
 
 function TOOL:LeftClick(stTrace)
@@ -373,21 +452,19 @@ function TOOL:LeftClick(stTrace)
         stSpinner.Radi = 0     -- Do not recreate the physics on update
         trEnt:Setup(stSpinner) -- Apply general data from the cvars
         trEnt:ApplyTweaks()    -- No need respawn the entity to update the tweaks
-        ply:SendLua("GAMEMODE:AddNotify(\"Spinner updated !\", NOTIFY_UNDO, 6)")
-        ply:SendLua("surface.PlaySound(\"ambient/water/drip"..math.random(1, 4)..".wav\")")
+        self:NotifyUser(ply, "Updated !", "UNDO", 6)
         return true
       end
       local vPos, aAng = stTrace.HitPos, stTrace.HitNormal:Angle()
             aAng:RotateAroundAxis(aAng:Right(), 90)
             aAng = aAng + (stSpinner.AxiL:Cross(stSpinner.LevL)):AngleEx(stSpinner.AxiL)
       local eSpin  = newSpinner(ply, vPos, aAng, stSpinner)
-      if(eSpin) then
-        self:ApplySpawn(eSpin, stTrace)
+      if(eSpin) then self:ApplySpawn(eSpin, stTrace)
         local C = self:Constraint(eSpin, stTrace)
         undo.Create("Spinner")
           undo.AddEntity(eSpin)
           if(C) then undo.AddEntity(C) end
-          undo.SetCustomUndoText("Spinner linked")
+          undo.SetCustomUndoText("Spinner link")
           undo.SetPlayer(ply)
         undo.Finish(); return true
       end
@@ -402,18 +479,17 @@ function TOOL:RightClick(stTrace)
   if(trEnt and trEnt:IsValid()) then
     local ply = self:GetOwner()
     local cls = trEnt:GetClass()
-    if(cls == "prop_physics") then
+    if(cls == "prop_physics") then local sMod = trEnt:GetModel()
       local vPos, nEdr = trEnt:GetPos(), varMaxDirOfs:GetFloat()
-      local sPth = string.GetFileFromFilename(trEnt:GetModel())
+      local sPth = string.GetFileFromFilename(sMod)
       local vAxs, vLvr = (nEdr * stTrace.HitNormal), (nEdr * ply:GetRight())
             vAxs:Add(vPos); vAxs:Set(trEnt:WorldToLocal(vAxs)); vAxs:Normalize()
             vLvr:Add(vPos); vLvr:Set(trEnt:WorldToLocal(vLvr)); vLvr:Normalize()
       local sAxs, sLvr = strVector(vAxs), strVector(vLvr)
       ply:ConCommand(gsToolNameU.."cusaxis " ..sAxs.."\n") -- Axis vector as string
       ply:ConCommand(gsToolNameU.."cuslever "..sLvr.."\n") -- Lever vector as string
-      ply:ConCommand(gsToolNameU.."model "   ..trEnt:GetModel().."\n")
-      ply:SendLua("GAMEMODE:AddNotify(\"Model: "..sPth.." selected !\", NOTIFY_UNDO, 6)")
-      ply:SendLua("surface.PlaySound(\"ambient/water/drip"..math.random(1, 4)..".wav\")"); return true
+      ply:ConCommand(gsToolNameU.."model "   ..sMod.."\n") -- Trace model as string
+      self:NotifyUser(ply, "Selected "..sPth.." !", "UNDO", 6); return true
     elseif(cls == gsSentHash) then
       local phEnt = trEnt:GetPhysicsObject()
       ply:ConCommand(gsToolNameU.."power "   ..tostring(trEnt:GetPower()).."\n") -- Number
@@ -421,8 +497,7 @@ function TOOL:RightClick(stTrace)
       ply:ConCommand(gsToolNameU.."levercnt "..tostring(trEnt:GetLeverCount()).."\n") -- Number
       ply:ConCommand(gsToolNameU.."toggle "  ..tostring(trEnt:IsToggled() and 1 or 0).."\n")
       ply:ConCommand(gsToolNameU.."mass "    ..tostring(phEnt:GetMass()).."\n")
-      ply:SendLua("GAMEMODE:AddNotify(\"Settings retrieved !\", NOTIFY_UNDO, 6)")
-      ply:SendLua("surface.PlaySound(\"ambient/water/drip"..math.random(1, 4)..".wav\")"); return true
+      self:NotifyUser(ply, "Retrieved !", "UNDO", 6); return true
     end; return false
   end; return false
 end
@@ -475,39 +550,42 @@ function TOOL:GetRadiusRatio(stTrace, oPly)
   return (nRatio * math.Clamp(ratiom / plyd, 1, ratioc))
 end
 
+function TOOL:DrawUCS(vO, vF, vL, vA, nN, nR)
+  local xyO =  vO:ToScreen()
+  local xyX = (vO + nN * vF):ToScreen()
+  local xyY = (vO + nN * vL):ToScreen()
+  local xyZ = (vO + nN * vA):ToScreen()
+  drawLineSpinner  (xyO, xyX, "r")
+  drawLineSpinner  (xyO, xyY, "g")
+  drawLineSpinner  (xyO, xyZ, "b")
+  drawCircleSpinner(xyO, nR , "y")
+end
+
 function TOOL:DrawHUD()
   if(self:GetAdviser()) then
     local ply   = LocalPlayer()
     local stTr  = ply:GetEyeTrace()
     if(not stTr) then return end
     local trEnt = stTr.Entity
-    local axs   = self:GetDrawScale()
+    local axis  = self:GetDrawScale()
     local radc  = self:GetRadiusRatio(stTr, ply)
     if(stTr.HitWorld) then
-      local trCen = stTr.HitPos
-      local xyO = trCen:ToScreen()
       local vF, vL, vA = self:RecalculateUCS(stTr.HitNormal, ply:GetRight())
-      local xyX  = (trCen + axs * vF):ToScreen()
-      local xyY  = (trCen + axs * vL):ToScreen()
-      local xyZ  = (trCen + axs * vA):ToScreen()
-      drawLineSpinner(xyO, xyX, "r")
-      drawLineSpinner(xyO, xyY, "g")
-      drawLineSpinner(xyO, xyZ, "b")
-      drawCircleSpinner(xyO,radc,"y")
+      self:DrawUCS(stTr.HitPos, vF, vL, vA, axis, radc)
     elseif(trEnt and trEnt:IsValid()) then
       local cls = trEnt:GetClass()
       if(cls == gsSentHash) then
         local trAng = trEnt:GetAngles()
         local trCen = trEnt:LocalToWorld(trEnt:GetSpinCenter())
         local nP, nL = trEnt:GetPower(), trEnt:GetLever()
-        local nF, nE = axs * (nP / varMaxScale:GetFloat()), axs * (nP / math.abs(nP))
+        local nF, nE = axis * (nP / varMaxScale:GetFloat()), axis * (nP / math.abs(nP))
         local spCnt = trEnt:GetLeverCount()
         local spAxs = trEnt:GetTorqueAxis()
         local spLev = trEnt:GetTorqueLever()
         local wvAxs = Vector(); wvAxs:Set(spAxs); wvAxs:Rotate(trAng)
         local wvLev = Vector(); wvLev:Set(spLev); wvLev:Rotate(trAng)
         local dAng, dA = wvLev:AngleEx(wvAxs), (360 / spCnt)
-        local xyOO, xyOA = trCen:ToScreen(), (axs * wvAxs + trCen):ToScreen()
+        local xyOO, xyOA = trCen:ToScreen(), (axis * wvAxs + trCen):ToScreen()
         drawLineSpinner(xyOO, xyOA, "b")
         drawCircleSpinner(xyOO, radc, "y")
         for ID = 1, spCnt do
@@ -521,22 +599,17 @@ function TOOL:DrawHUD()
           end; dAng:RotateAroundAxis(wvAxs, dA)
         end
       elseif(cls == "prop_physics") then
-        local aAng = trEnt:GetAngles()
+        local trAng, vF, vL, vA = trEnt:GetAngles()
         local trCen, vMax = trEnt:GetRenderBounds()
               trCen:Add(vMax); trCen:Mul(0.5)
               trCen:Set(trEnt:LocalToWorld(trCen))
-        local xyO, vF, vL, vA = trCen:ToScreen()
-        if(input.IsKeyDown(KEY_LALT)) then
+        if(input.IsKeyDown(KEY_LALT)) then -- Read client vectors
           vF, vL, vA = self:RecalculateUCS(self:GetVectors())
-          vF:Rotate(aAng); vL:Rotate(aAng); vA:Rotate(aAng)
-        else vF, vL, vA = self:RecalculateUCS(stTr.HitNormal, ply:GetRight()) end
-        local xyX  = (trCen + axs * vF):ToScreen()
-        local xyY  = (trCen + axs * vL):ToScreen()
-        local xyZ  = (trCen + axs * vA):ToScreen()
-        drawLineSpinner(xyO, xyX, "r")
-        drawLineSpinner(xyO, xyY, "g")
-        drawLineSpinner(xyO, xyZ, "b")
-        drawCircleSpinner(xyO,radc,"y")
+          vF:Rotate(trAng); vL:Rotate(trAng); vA:Rotate(trAng) 
+        else -- Use the autogenerated trace vectors based on player right
+          vF, vL, vA = self:RecalculateUCS(stTr.HitNormal, ply:GetRight())
+        end -- Create and draw the coordinate system
+        self:DrawUCS(trCen, vF, vL, vA, axis, radc)
       end
     end
   end
@@ -546,9 +619,9 @@ local conVarList = TOOL:BuildConVarList()
 function TOOL.BuildCPanel(CPanel)
   local nMaxLine  = varMaxLine:GetFloat()
   local nMaxScale = varMaxScale:GetFloat()
-  local CurY, pItem = 0 -- pItem is the current panel created
-          CPanel:SetName(language.GetPhrase("tool."..gsToolName..".name"))
-  pItem = CPanel:Help   (language.GetPhrase("tool."..gsToolName..".desc"))
+  local CurY, pItem, sTr = 0 -- pItem is the current panel created
+          CPanel:SetName(getPhrase("tool."..gsToolName..".name"))
+  pItem = CPanel:Help   (getPhrase("tool."..gsToolName..".desc"))
   CurY  = CurY + pItem:GetTall() + 2
 
   pItem = CPanel:AddControl( "ComboBox",{
@@ -557,67 +630,60 @@ function TOOL.BuildCPanel(CPanel)
               Options    = {["#Default"] = conVarList},
               CVars      = table.GetKeys(conVarList)})
   CurY  = CurY + pItem:GetTall() + 2
-
-  local pComboConst = CPanel:ComboBox("Constraint type", gsToolNameU.."constraint")
-        pComboConst:SetPos(2, CurY)
-        pComboConst:SetTall(20)
-        pComboConst:AddChoice("Skip linking", 0)
-        pComboConst:AddChoice("Weld spinner", 1)
-        pComboConst:AddChoice("Axis normal" , 2)
-        pComboConst:AddChoice("Ball spinner", 3)
-        pComboConst:AddChoice("Ball trace"  , 4)
+  
+  sTr = "tool."..gsToolName..".constraint"
+  local pComboConst = CPanel:ComboBox(getPhrase(sTr), gsToolNameU.."constraint")
+        pComboConst:SetPos(2, CurY); pComboConst:SetTall(20)
+        for iD = 0, 4 do pComboConst:AddChoice(getPhrase(sTr..iD), iD) end
   CurY = CurY + pComboConst:GetTall() + 2
-
-  local pComboAxis = CPanel:ComboBox("Axis direction", gsToolNameU.."diraxis")
-        pComboAxis:SetPos(2, CurY)
-        pComboAxis:SetTall(20)
-        pComboAxis:AddChoice("<Custom>", 0)
-        pComboAxis:AddChoice("+X Red  ", 1)
-        pComboAxis:AddChoice("+Y Green", 2)
-        pComboAxis:AddChoice("+Z Blue ", 3)
-        pComboAxis:AddChoice("-X Red  ", 4)
-        pComboAxis:AddChoice("-Y Green", 5)
-        pComboAxis:AddChoice("-Z Blue ", 6)
+  
+  sTr = "tool."..gsToolName..".diraxis"
+  local pComboAxis = CPanel:ComboBox(getPhrase(sTr), gsToolNameU.."diraxis")
+        pComboAxis:SetPos(2, CurY); pComboAxis:SetTall(20)
+        for iD = 0, 6 do pComboAxis:AddChoice(getPhrase(sTr..iD), iD) end
   CurY = CurY + pComboAxis:GetTall() + 2
 
-  local pComboLever = CPanel:ComboBox("Lever direction", gsToolNameU.."dirlever")
-        pComboLever:SetPos(2, CurY)
-        pComboLever:SetTall(20)
-        pComboLever:AddChoice("<Custom>", 0)
-        pComboLever:AddChoice("+X Red  ", 1)
-        pComboLever:AddChoice("+Y Green", 2)
-        pComboLever:AddChoice("+Z Blue ", 3)
-        pComboLever:AddChoice("-X Red  ", 4)
-        pComboLever:AddChoice("-Y Green", 5)
-        pComboLever:AddChoice("-Z Blue ", 6)
+  sTr = "tool."..gsToolName..".dirlever"
+  local pComboLever = CPanel:ComboBox(getPhrase(sTr), gsToolNameU.."dirlever")
+        pComboLever:SetPos(2, CurY); pComboLever:SetTall(20)
+        for iD = 0, 6 do pComboLever:AddChoice(getPhrase(sTr..iD), iD) end
   CurY = CurY + pComboLever:GetTall() + 2
 
-  CPanel:AddControl( "Numpad", {  Label = "Key Forward:",
+  CPanel:AddControl( "Numpad", {  Label = getPhrase("tool."..gsToolName..".keyfwd"),
                   Command = gsToolNameU.."keyfwd",
                   ButtonSize = 10 } );
 
-  CPanel:AddControl( "Numpad", {  Label = "Key Reverse:",
+  CPanel:AddControl( "Numpad", {  Label = getPhrase("tool."..gsToolName..".keyrev"),
                   Command = gsToolNameU.."keyrev",
                   ButtonSize = 10 } );
 
-  CPanel:NumSlider("Mass: "        , gsToolNameU.."mass"     , 1, varMaxMass:GetFloat(), 3)
-  CPanel:NumSlider("Power: "       , gsToolNameU.."power"    ,-nMaxScale, nMaxScale, 3)
-  CPanel:NumSlider("Friction: "    , gsToolNameU.."friction" , 0, nMaxScale, 3)
-  CPanel:NumSlider("Force limit: " , gsToolNameU.."forcelim" , 0, nMaxScale, 3)
-  CPanel:NumSlider("Torque limit: ", gsToolNameU.."torqulim" , 0, nMaxScale, 3)
-  CPanel:NumSlider("Lever: "       , gsToolNameU.."lever"    , 0, nMaxScale, 3)
-  CPanel:NumSlider("Lever count: " , gsToolNameU.."levercnt" , 1, gnMaxAng , 3)
-  CPanel:NumSlider("Radius: "      , gsToolNameU.."radius"   , 0, varMaxRadius:GetFloat(), 3)
-  CPanel:Button   ("V Reset offsets V", gsToolNameU.."resetoffs")
-  CPanel:NumSlider("Offset X: "    , gsToolNameU.."linx"     , -nMaxLine, nMaxLine, 3)
-  CPanel:NumSlider("Offset Y: "    , gsToolNameU.."liny"     , -nMaxLine, nMaxLine, 3)
-  CPanel:NumSlider("Offset Z: "    , gsToolNameU.."linz"     , -nMaxLine, nMaxLine, 3)
-  CPanel:NumSlider("Offset pitch: ", gsToolNameU.."angp"     , -gnMaxAng, gnMaxAng, 3)
-  CPanel:NumSlider("Offset yaw: "  , gsToolNameU.."angy"     , -gnMaxAng, gnMaxAng, 3)
-  CPanel:NumSlider("Offset roll: " , gsToolNameU.."angr"     , -gnMaxAng, gnMaxAng, 3)
-  CPanel:NumSlider("Draw scale: "  , gsToolNameU.."drwscale" , 0, nMaxLine, 3)
-  CPanel:CheckBox("Toggle", gsToolNameU.."toggle")
-  CPanel:CheckBox("NoCollide with trace", gsToolNameU.."nocollide")
-  CPanel:CheckBox("Enable ghosting", gsToolNameU.."ghosting")
-  CPanel:CheckBox("Enable adviser", gsToolNameU.."adviser")
+  CPanel:NumSlider(getPhrase("tool."..gsToolName..".mass"     ), gsToolNameU.."mass"     , 1, varMaxMass:GetFloat(), 3)
+  CPanel:NumSlider(getPhrase("tool."..gsToolName..".power"    ), gsToolNameU.."power"    ,-nMaxScale, nMaxScale, 3)
+  CPanel:NumSlider(getPhrase("tool."..gsToolName..".friction" ), gsToolNameU.."friction" , 0, nMaxScale, 3)
+  CPanel:NumSlider(getPhrase("tool."..gsToolName..".forcelim" ), gsToolNameU.."forcelim" , 0, nMaxScale, 3)
+  CPanel:NumSlider(getPhrase("tool."..gsToolName..".torqulim" ), gsToolNameU.."torqulim" , 0, nMaxScale, 3)
+  CPanel:NumSlider(getPhrase("tool."..gsToolName..".lever"    ), gsToolNameU.."lever"    , 0, nMaxScale, 3)
+  CPanel:NumSlider(getPhrase("tool."..gsToolName..".levercnt" ), gsToolNameU.."levercnt" , 1, gnMaxAng , 3)
+  CPanel:NumSlider(getPhrase("tool."..gsToolName..".radius"   ), gsToolNameU.."radius"   , 0, varMaxRadius:GetFloat(), 3)
+  CPanel:Button   (getPhrase("tool."..gsToolName..".resetoffs"), gsToolNameU.."resetoffs")
+  CPanel:NumSlider(getPhrase("tool."..gsToolName..".linx"     ), gsToolNameU.."linx"     , -nMaxLine, nMaxLine, 3)
+  CPanel:NumSlider(getPhrase("tool."..gsToolName..".liny"     ), gsToolNameU.."liny"     , -nMaxLine, nMaxLine, 3)
+  CPanel:NumSlider(getPhrase("tool."..gsToolName..".linz"     ), gsToolNameU.."linz"     , -nMaxLine, nMaxLine, 3)
+  CPanel:NumSlider(getPhrase("tool."..gsToolName..".angp"     ), gsToolNameU.."angp"     , -gnMaxAng, gnMaxAng, 3)
+  CPanel:NumSlider(getPhrase("tool."..gsToolName..".angy"     ), gsToolNameU.."angy"     , -gnMaxAng, gnMaxAng, 3)
+  CPanel:NumSlider(getPhrase("tool."..gsToolName..".angr"     ), gsToolNameU.."angr"     , -gnMaxAng, gnMaxAng, 3)
+  CPanel:NumSlider(getPhrase("tool."..gsToolName..".drwscale" ), gsToolNameU.."drwscale" , 0, nMaxLine, 3)
+  CPanel:CheckBox (getPhrase("tool."..gsToolName..".toggle"   ), gsToolNameU.."toggle")
+  CPanel:CheckBox (getPhrase("tool."..gsToolName..".nocollide"), gsToolNameU.."nocollide")
+  CPanel:CheckBox (getPhrase("tool."..gsToolName..".ghosting" ), gsToolNameU.."ghosting")
+  CPanel:CheckBox (getPhrase("tool."..gsToolName..".adviser"  ), gsToolNameU.."adviser")
+end
+
+-- listen for changes to the localify language and reload the tool's menu to update the localizations
+if(CLIENT) then
+  cvars.RemoveChangeCallback(varLng:GetName(), gsToolNameU.."lang")
+  cvars.AddChangeCallback(varLng:GetName(), function(sNam, vO, vN) setTranslate(vN)
+    local cPanel = controlpanel.Get(goTool.Mode); if(not IsValid(cPanel)) then return end
+    cPanel:ClearControls(); goTool.BuildCPanel(cPanel)
+  end, gsToolNameU.."lang")
 end

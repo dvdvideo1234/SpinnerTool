@@ -38,8 +38,13 @@ ENT.Spawnable       = false
 ENT.AdminSpawnable  = false
 
 local function getSign(nN)
-  return (nN / math.abs(nN))
-end
+  return (nN / math.abs(nN)) end
+
+local function getPower(vRes, vVec, nNum)
+  vRes:Set(vVec); vRes:Mul(nNum); return vRes end
+
+local function getLever(vRes, vPos, vVec, nNum)
+  vRes:Set(vVec); vRes:Mul(nNum); vRes:Add(vPos); return vRes end
 
 function ENT:GetPower()
   if(SERVER)     then local oSent = self[gsSentHash]; return oSent.Power
@@ -175,18 +180,12 @@ if(SERVER) then
     end; return true
   end
 
-  local function getPower(vRes, vVec, nNum)
-    vRes:Set(vVec); vRes:Mul(nNum); return vRes end
-
-  local function getLever(vRes, vPos, vVec, nNum)
-    vRes:Set(vVec); vRes:Mul(nNum); vRes:Add(vPos); return vRes end
-
   function ENT:SetPhysRadius(nRad)
     local nRad = math.Clamp(tonumber(nRad) or 0, 0, varMaxRadius:GetFloat())
-    if(nRad > 0) then
-      local oSent = self[gsSentHash]
-      local vMin  = Vector(-nRad,-nRad,-nRad)
-      local vMax  = Vector( nRad, nRad, nRad)
+    if(nRad > 0) then local oSent = self[gsSentHash]
+      local vCen = self:OBBCenter()
+      local vMin = Vector(-nRad,-nRad,-nRad); vMin:Add(vCen)
+      local vMax = Vector( nRad, nRad, nRad); vMax:Add(vCen)
       self:PhysicsInitSphere(nRad)
       self:SetCollisionBounds(vMin, vMax)
       self:PhysWake(); oSent.Radi = nRad
@@ -205,8 +204,7 @@ if(SERVER) then
     if(oSent.Lever == 0) then -- Use the half of the bounding box size
       vMin, vMax = self:OBBMins(), self:OBBMaxs()
       oSent.Lever = ((vMax - vMin):Length()) / 2
-    end
-    self:SetNWFloat(gsSentHash.."_lever", oSent.Lever); return true
+    end; self:SetNWFloat(gsSentHash.."_lever", oSent.Lever); return true
   end
 
   function ENT:SetTorqueAxis(vDir)
@@ -219,13 +217,11 @@ if(SERVER) then
 
   function ENT:SetTorqueLever(vDir, nCnt)
     local oSent = self[gsSentHash]
-    local nCnt  = (tonumber(nCnt) or 0)
-    if(nCnt <= 0) then
+    local nCnt  = (tonumber(nCnt) or 0); if(nCnt <= 0) then
       self:SetError("ENT.SetTorqueLever: Lever count invalid"); return false end
     if(vDir:Length() == 0) then
       self:SetError("ENT.SetTorqueLever: Force lever invalid"); return false end
-    oSent.CLev = nCnt
-    oSent.DAng = (360 / nCnt)
+    oSent.CLev, oSent.DAng = nCnt, (360 / nCnt)
     oSent.LevL:Set(vDir) -- Lever direction matched to player right
     oSent.ForL:Set(oSent.AxiL:Cross(oSent.LevL)) -- Force
     oSent.LevL:Set(oSent.ForL:Cross(oSent.AxiL)) -- Lever
@@ -236,7 +232,8 @@ if(SERVER) then
 
   function ENT:SetToggled(bTogg)
     local oSent = self[gsSentHash]; oSent.Togg = tobool(bTogg or false)
-    self:SetNWBool(gsSentHash.."_togg", oSent.Togg) end
+    self:SetNWBool(gsSentHash.."_togg", oSent.Togg)
+  end
 
   function ENT:ApplyTweaks()
     local oSent  = self[gsSentHash]
@@ -360,30 +357,25 @@ if(SERVER) then
     self:BroadCast(nPw, nLe):Toc(); return true
   end
 
-  local function spinForward(oPly, oEnt)
+  local function spinStart(oPly, oEnt, nDir)
     if(not (oEnt and oEnt:IsValid())) then return end
     if(not (oEnt:GetClass() == gsSentHash)) then return end
     local oSent = oEnt[gsSentHash]
     if(oEnt:IsToggled()) then
       if(oSent.Dir ~= 0) then
            oSent.On, oSent.Dir = false, 0
-      else oSent.On, oSent.Dir = true , 1 end
+      else oSent.On, oSent.Dir = true , nDir end
     else
-      oSent.On, oSent.Dir = true, 1
+      oSent.On, oSent.Dir = true, nDir
     end
+  end
+  
+  local function spinForward(oPly, oEnt)
+    spinStart(oPly, oEnt,  1)
   end
 
   local function spinReverse(oPly, oEnt)
-    if(not (oEnt and oEnt:IsValid())) then return end
-    if(not (oEnt:GetClass() == gsSentHash)) then return end
-    local oSent = oEnt[gsSentHash]
-    if(oEnt:IsToggled()) then
-      if(oSent.Dir ~= 0) then
-           oSent.On, oSent.Dir = false,  0
-      else oSent.On, oSent.Dir = true , -1 end
-    else
-      oSent.On, oSent.Dir = true, -1
-    end
+    spinStart(oPly, oEnt, -1)   
   end
 
   local function spinStop(oPly, oEnt)
