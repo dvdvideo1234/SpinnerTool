@@ -204,8 +204,7 @@ if(SERVER) then
     if(oSent.Lever == 0) then -- Use the half of the bounding box size
       vMin, vMax = self:OBBMins(), self:OBBMaxs()
       oSent.Lever = ((vMax - vMin):Length()) / 2
-    end
-    self:SetNWFloat(gsSentHash.."_lever", oSent.Lever); return true
+    end; self:SetNWFloat(gsSentHash.."_lever", oSent.Lever); return true
   end
 
   function ENT:SetTorqueAxis(vDir)
@@ -358,30 +357,25 @@ if(SERVER) then
     self:BroadCast(nPw, nLe):Toc(); return true
   end
 
-  local function spinForward(oPly, oEnt)
+  local function spinStart(oPly, oEnt, nDir)
     if(not (oEnt and oEnt:IsValid())) then return end
     if(not (oEnt:GetClass() == gsSentHash)) then return end
     local oSent = oEnt[gsSentHash]
     if(oEnt:IsToggled()) then
       if(oSent.Dir ~= 0) then
            oSent.On, oSent.Dir = false, 0
-      else oSent.On, oSent.Dir = true , 1 end
+      else oSent.On, oSent.Dir = true , nDir end
     else
-      oSent.On, oSent.Dir = true, 1
+      oSent.On, oSent.Dir = true, nDir
     end
+  end
+  
+  local function spinForward(oPly, oEnt)
+    spinStart(oPly, oEnt,  1)
   end
 
   local function spinReverse(oPly, oEnt)
-    if(not (oEnt and oEnt:IsValid())) then return end
-    if(not (oEnt:GetClass() == gsSentHash)) then return end
-    local oSent = oEnt[gsSentHash]
-    if(oEnt:IsToggled()) then
-      if(oSent.Dir ~= 0) then
-           oSent.On, oSent.Dir = false,  0
-      else oSent.On, oSent.Dir = true , -1 end
-    else
-      oSent.On, oSent.Dir = true, -1
-    end
+    spinStart(oPly, oEnt, -1)   
   end
 
   local function spinStop(oPly, oEnt)
