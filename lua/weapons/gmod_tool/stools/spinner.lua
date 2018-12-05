@@ -104,12 +104,14 @@ local function setTranslate(sT)  -- Override translations file
   gtLang["Cleaned_"..gsEntLimit             ] = "All spinners are cleared!"
   gtLang["SBoxLimit_"..gsEntLimit           ] = "You've hit the limit for created spinners!"
   local sT = tostring(sT or ""); if(sT ~= "en") then
-    local fT = CompileFile(("%s/lang/%s.lua"):format(gsToolName, sT))
-    local bF, fFo = pcall(fT); if(bF) then
-      local bS, tTo = pcall(fFo, gsToolName, gsEntLimit); if(bS) then
-        for key, val in pairs(gtLang) do gtLang[key] = (tTo[key] or gtLang[key]) end
-      else ErrorNoHalt(gsToolName..": setTranslate("..sT.."): "..tostring(tTo)) end
-    else ErrorNoHalt(gsToolName..": setTranslate("..sT.."): "..tostring(fFo)) end
+    local sN = ("%s/lang/%s.lua"):format(gsToolName, sT)
+    if(file.Exists("lua/"..sN, "GAME")) then local fT = CompileFile(sN)
+      local bF, fFo = pcall(fT); if(bF) then
+        local bS, tTo = pcall(fFo, gsToolName, gsEntLimit); if(bS) then
+          for key, val in pairs(gtLang) do gtLang[key] = (tTo[key] or gtLang[key]) end
+        else ErrorNoHalt(gsToolName..": setTranslate("..sT.."): "..tostring(tTo)) end
+      else ErrorNoHalt(gsToolName..": setTranslate("..sT.."): "..tostring(fFo)) end
+    end
   end; for key, val in pairs(gtLang) do language.Add(key, val) end
 end
 
