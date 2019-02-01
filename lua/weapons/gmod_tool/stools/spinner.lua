@@ -26,6 +26,7 @@ local gsToolName   = gsSentName
 local gsToolNameU  = gsToolName.."_"
 local gsEntLimit   = gsSentName.."s"
 local gnMaxAng     = 360
+local gsLangForm   = ("%s"..gsToolName.."/lang/%s")
 local VEC_ZERO     = Vector()
 local ANG_ZERO     = Angle ()
 local goTool       = TOOL
@@ -48,76 +49,22 @@ local gtDirectionID = {}
       gtDirectionID[5] = Vector( 0,-1, 0)
       gtDirectionID[6] = Vector( 0, 0,-1)
 
--- Send language definitions to the client to populate the menu
-local gsLangForm = ("%s"..gsToolName.."/lang/%s")
-local gtTransFile = file.Find(gsLangForm:format("lua/", "*.lua"), "GAME")
-for iD = 1, #gtTransFile do AddCSLuaFile(gsLangForm:format("", gtTransFile[iD])) end
-
-local function setTranslate(sT)  -- Override translations file
-  gtLang["tool."..gsToolName..".name"       ] = "Spinner tool"
-  gtLang["tool."..gsToolName..".desc"       ] = "Creates/Updates a spinner entity"
-  gtLang["tool."..gsToolName..".left"       ] = "Create/Update spinner"
-  gtLang["tool."..gsToolName..".left_use"   ] = "Create/Update spinner"
-  gtLang["tool."..gsToolName..".right"      ] = "Copy settings"
-  gtLang["tool."..gsToolName..".right_use"  ] = "Copy settings"
-  gtLang["tool."..gsToolName..".reload"     ] = "Remove spinner"
-  gtLang["tool."..gsToolName..".constraint" ] = "Constraint type"
-  gtLang["tool."..gsToolName..".constraint0"] = "Skip linking"
-  gtLang["tool."..gsToolName..".constraint1"] = "Weld spinner"
-  gtLang["tool."..gsToolName..".constraint2"] = "Axis normal"
-  gtLang["tool."..gsToolName..".constraint3"] = "Ball spinner"
-  gtLang["tool."..gsToolName..".constraint4"] = "Ball trace"
-  gtLang["tool."..gsToolName..".diraxis"    ] = "Axis direction"
-  gtLang["tool."..gsToolName..".diraxis0"   ] = "<Custom>"
-  gtLang["tool."..gsToolName..".diraxis1"   ] = "+X Red"
-  gtLang["tool."..gsToolName..".diraxis2"   ] = "+Y Green"
-  gtLang["tool."..gsToolName..".diraxis3"   ] = "+Z Blue"
-  gtLang["tool."..gsToolName..".diraxis4"   ] = "-X Red"
-  gtLang["tool."..gsToolName..".diraxis5"   ] = "-Y Green"
-  gtLang["tool."..gsToolName..".diraxis6"   ] = "-Z Blue"
-  gtLang["tool."..gsToolName..".dirlever"   ] = "Lever direction"
-  gtLang["tool."..gsToolName..".dirlever0"  ] = "<Custom>"
-  gtLang["tool."..gsToolName..".dirlever1"  ] = "+X Red"
-  gtLang["tool."..gsToolName..".dirlever2"  ] = "+Y Green"
-  gtLang["tool."..gsToolName..".dirlever3"  ] = "+Z Blue"
-  gtLang["tool."..gsToolName..".dirlever4"  ] = "-X Red"
-  gtLang["tool."..gsToolName..".dirlever5"  ] = "-Y Green"
-  gtLang["tool."..gsToolName..".dirlever6"  ] = "-Z Blue"
-  gtLang["tool."..gsToolName..".keyfwd"     ] = "Key Forward:"
-  gtLang["tool."..gsToolName..".keyrev"     ] = "Key Reverse:"
-  gtLang["tool."..gsToolName..".mass"       ] = "Mass: "
-  gtLang["tool."..gsToolName..".power"      ] = "Power: "
-  gtLang["tool."..gsToolName..".friction"   ] = "Friction: "
-  gtLang["tool."..gsToolName..".forcelim"   ] = "Force limit: "
-  gtLang["tool."..gsToolName..".torqulim"   ] = "Torque limit: "
-  gtLang["tool."..gsToolName..".lever"      ] = "Lever length: "
-  gtLang["tool."..gsToolName..".levercnt"   ] = "Lever count: "
-  gtLang["tool."..gsToolName..".radius"     ] = "Sphere radius: "
-  gtLang["tool."..gsToolName..".resetoffs"  ] = "V Reset offsets V"
-  gtLang["tool."..gsToolName..".linx"       ] = "Offset X: "
-  gtLang["tool."..gsToolName..".liny"       ] = "Offset Y: "
-  gtLang["tool."..gsToolName..".linz"       ] = "Offset Z: "
-  gtLang["tool."..gsToolName..".angp"       ] = "Offset pitch: "
-  gtLang["tool."..gsToolName..".angy"       ] = "Offset yaw: "
-  gtLang["tool."..gsToolName..".angr"       ] = "Offset roll: "
-  gtLang["tool."..gsToolName..".drwscale"   ] = "Draw scale: "
-  gtLang["tool."..gsToolName..".toggle"     ] = "Toggle"
-  gtLang["tool."..gsToolName..".nocollide"  ] = "NoCollide with trace"
-  gtLang["tool."..gsToolName..".ghosting"   ] = "Enable ghosting"
-  gtLang["tool."..gsToolName..".adviser"    ] = "Enable adviser"
-  gtLang["Cleanup_"..gsEntLimit             ] = "Spinners"
-  gtLang["Cleaned_"..gsEntLimit             ] = "All spinners are cleared!"
-  gtLang["SBoxLimit_"..gsEntLimit           ] = "You've hit the limit for created spinners!"
-  local sT = tostring(sT or ""); if(sT ~= "en") then
-    local sN = ("%s/lang/%s.lua"):format(gsToolName, sT)
-    if(file.Exists("lua/"..sN, "GAME")) then local fT = CompileFile(sN)
-      local bF, fFo = pcall(fT); if(bF) then
-        local bS, tTo = pcall(fFo, gsToolName, gsEntLimit); if(bS) then
-          for key, val in pairs(gtLang) do gtLang[key] = (tTo[key] or gtLang[key]) end
-        else ErrorNoHalt(gsToolName..": setTranslate("..sT.."): "..tostring(tTo)) end
-      else ErrorNoHalt(gsToolName..": setTranslate("..sT.."): "..tostring(fFo)) end
-    end
-  end; for key, val in pairs(gtLang) do language.Add(key, val) end
+local function getTranslate(sT)
+  local sN = gsLangForm:format("", sT..".lua")
+  if(not file.Exists("lua/"..sN, "GAME")) then return nil end
+  local fT = CompileFile(sN); if(not fT) then return print("1") end
+  local bF, fF = pcall(fT); if(not bF) then return nil end
+  local bS, tS = pcall(fF, gsToolName, gsEntLimit)
+  if(not bF) then return nil end; return tS
+end
+      
+local function setTranslate(sT)
+  table.Empty(gtLang) -- Override translations file
+  local tB = getTranslate("en"); if(not tB) then
+    ErrorNoHalt(gsToolName..": setTranslate: Missing") end
+  if(sT ~= "en") then local tC = getTranslate(sT); if(tC) then
+    for key, val in pairs(tB) do tB[key] = (tC[key] or tB[key]) end end
+  end; for key, val in pairs(tB) do gtLang[key] = tB[key]; language.Add(key, val) end
 end
 
 local function getPhrase(sK)
@@ -128,6 +75,10 @@ local function getPhrase(sK)
 end
 
 if(SERVER) then
+
+  -- Send language translations to the client to populate the menu
+  local gtTransFile = file.Find(gsLangForm:format("lua/", "*.lua"), "GAME")
+  for iD = 1, #gtTransFile do AddCSLuaFile(gsLangForm:format("", gtTransFile[iD])) end
 
   CreateConVar("sbox_max"..gsEntLimit, 10, FCVAR_NOTIFY, "Maximum spinners to be spawned")
 
