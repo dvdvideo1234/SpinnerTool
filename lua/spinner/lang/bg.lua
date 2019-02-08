@@ -46,7 +46,7 @@
   tSet["tool."..sTool..".angy"       ] = "Отместване азимут: "
   tSet["tool."..sTool..".angr"       ] = "Отместване крен: "
   tSet["tool."..sTool..".drwscale"   ] = "Скала на чертане: "
-  tSet["tool."..sTool..".toggle"     ] = "Превключи"
+  tSet["tool."..sTool..".toggle"     ] = "Режим на превключване"
   tSet["tool."..sTool..".nocollide"  ] = "Не-сблъсък с трейса"
   tSet["tool."..sTool..".ghosting"   ] = "Активирай призрака"
   tSet["tool."..sTool..".adviser"    ] = "Активирай съветника"
