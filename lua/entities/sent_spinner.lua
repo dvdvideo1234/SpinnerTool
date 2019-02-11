@@ -189,13 +189,13 @@ if(SERVER) then
       self:PhysicsInitSphere(nRad)
       self:SetCollisionBounds(vMin, vMax)
       self:PhysWake(); oSent.Radi = nRad
-    end; return true
+    end; return self
   end
 
   function ENT:SetPower(nPow)
     local oSent = self[gsSentHash] -- Magnitude of the spinning force
     oSent.Power = math.Clamp((tonumber(nPow) or 0), -varMaxScale:GetFloat(), varMaxScale:GetFloat())
-    self:SetNWFloat(gsSentHash.."_power", oSent.Power); return true
+    self:SetNWFloat(gsSentHash.."_power", oSent.Power); return self
   end
 
   function ENT:SetLever(nLev)
@@ -204,35 +204,34 @@ if(SERVER) then
     if(oSent.Lever == 0) then -- Use the half of the bounding box size
       vMin, vMax = self:OBBMins(), self:OBBMaxs()
       oSent.Lever = ((vMax - vMin):Length()) / 2
-    end; self:SetNWFloat(gsSentHash.."_lever", oSent.Lever); return true
+    end; self:SetNWFloat(gsSentHash.."_lever", oSent.Lever); return self
   end
 
   function ENT:SetTorqueAxis(vDir)
-    local oSent = self[gsSentHash]
-    if(vDir:Length() == 0) then
-      self:SetError("ENT.SetTorqueAxis: Axis invalid"); return false end
+    local oSent = self[gsSentHash]; if(vDir:Length() == 0) then
+      self:SetError("ENT.SetTorqueAxis: Axis invalid"); return nil end
     oSent.AxiL:Set(vDir); oSent.AxiL:Normalize()
-    self:SetNWVector(gsSentHash.."_adir",oSent.AxiL); return true
+    self:SetNWVector(gsSentHash.."_adir",oSent.AxiL); return self
   end
 
   function ENT:SetTorqueLever(vDir, nCnt)
     local oSent = self[gsSentHash]
     local nCnt  = (tonumber(nCnt) or 0); if(nCnt <= 0) then
-      self:SetError("ENT.SetTorqueLever: Lever count invalid"); return false end
+      self:SetError("ENT.SetTorqueLever: Lever count invalid"); return nil end
     if(vDir:Length() == 0) then
-      self:SetError("ENT.SetTorqueLever: Force lever invalid"); return false end
+      self:SetError("ENT.SetTorqueLever: Force lever invalid"); return nil end
     oSent.CLev, oSent.DAng = nCnt, (360 / nCnt)
     oSent.LevL:Set(vDir) -- Lever direction matched to player right
     oSent.ForL:Set(oSent.AxiL:Cross(oSent.LevL)) -- Force
     oSent.LevL:Set(oSent.ForL:Cross(oSent.AxiL)) -- Lever
     oSent.ForL:Normalize(); oSent.LevL:Normalize()
     self:SetNWInt(gsSentHash.."_lcnt",oSent.CLev)
-    self:SetNWVector(gsSentHash.."_ldir",oSent.LevL); return true
+    self:SetNWVector(gsSentHash.."_ldir",oSent.LevL); return self
   end
 
   function ENT:SetToggled(bTogg)
     local oSent = self[gsSentHash]; oSent.Togg = tobool(bTogg or false)
-    self:SetNWBool(gsSentHash.."_togg", oSent.Togg)
+    self:SetNWBool(gsSentHash.."_togg", oSent.Togg); return self
   end
 
   function ENT:ApplyTweaks()
@@ -243,6 +242,7 @@ if(SERVER) then
     oSent.Rate.bcTot = (varBroadCast:GetFloat() / 1000) -- Broadcast time sever-clients [ms] to [s]
     oSent.Rate.bcTim = (varBroadCast:GetFloat() / 1000) -- Broadcast compare value      [ms] to [s]
     oSent.Rate.eTick = (varTickRate:GetFloat()  / 1000) -- Entity ticking interval      [ms] to [s]
+    return self
   end
 
   function ENT:Setup(stSpinner)
@@ -265,20 +265,20 @@ if(SERVER) then
     collectgarbage(); return true -- Everything is fine !
   end
 
-  -- In Wiremod this is done in /registerOperator("iwc", "", "n", function(self, args)/
-  -- https://facepunch.com/showthread.php?t=1566053&p=52298677#post52298677
-  -- https://github.com/wiremod/wire/blob/master/lua/entities/gmod_wire_expression2/core/core.lua#L232
+  -- In Wiremod this is done in `registerOperator("iwc", "", "n", function(self, args)`
+  -- This operator is defined in `gmod_wire_expression2/core/core.lua`
+  -- Bauically it checks if `Src` is valid to see of the port is connected
   function ENT:HasWire(sIn)
     local tIn = (sIn and self.Inputs[sIn] or nil)
     return ((tIn and IsValid(tIn.Src)) and tIn or nil)
   end
 
-  function ENT:ReadWire(sIn)
+  function ENT:GetWire(sIn)
     local tIn = self:HasWire(sIn)
     return (tIn and tIn.Value or nil)
   end
 
-  function ENT:WriteWire(sOut, anyVal)
+  function ENT:SetWire(sOut, anyVal)
     WireLib.TriggerOutput(self, sOut, anyVal); return self
   end
 
@@ -294,7 +294,7 @@ if(SERVER) then
       if(tmRate.thTim >= tmRate.thEvt and tmRate.isWDT) then -- Watchdog error
         self:SetError("ENT.Tic: Duty margin fail ["..tostring(tmRate.thDet).."%]") end
       tmRate.bcTim = tmRate.bcTim - tmRate.thEvt         -- Update broadcast time [s]
-    end
+    end; return self
   end
 
   function ENT:Toc()
@@ -319,15 +319,11 @@ if(SERVER) then
 
   function ENT:Think() self:Tic()
     local nPw, nLe, wFr, wLe, wPw
-    local oSent = self[gsSentHash]
-    local oPhys = self:GetPhysicsObject()
+    local oSent, oPhys = self[gsSentHash], self:GetPhysicsObject()
     if(oPhys and oPhys:IsValid()) then
       local vCn = self:LocalToWorld(oPhys:GetMassCenter())
-      if(WireLib) then
-        local wOn = self:ReadWire("On")
-              wPw = self:ReadWire("Power")
-              wLe = self:ReadWire("Lever")
-              wFr = self:ReadWire("Force")
+      if(WireLib) then local wOn = self:GetWire("On")
+        wPw, wLe, wFr = self:GetWire("Power"), self:GetWire("Lever"), self:GetWire("Force")
         if(wOn ~= nil) then oSent.On = (wOn ~= 0) end -- On connected toggle with wire
       end -- Remember internal settings for lever and power when wire is disconnected
       if(oSent.On) then -- Disable toggling via numpad if wire is connected
@@ -343,48 +339,46 @@ if(SERVER) then
           oPhys:ApplyForceOffset(getPower(vPwt, vF, nPw), getLever(vLvt, vCn, vL, nLe))
           aLev:RotateAroundAxis(vAxw, oSent.DAng)
         end
-        if(WireLib) then -- Take the down-force into account ( if given )
+        if(WireLib) then self:SetWire("Axis", vAxw)
           if(wFr and wFr:Length() > 0) then oPhys:ApplyForceCenter(wFr) end
-          self:WriteWire("Axis", vAxw)
-        end
+        end -- Take the down-force into account ( if given )
       end
       if(WireLib) then
-        self:WriteWire("RPM", oPhys:GetAngleVelocity():Dot(oSent.AxiL) / 6) end
+        self:SetWire("RPM", oPhys:GetAngleVelocity():Dot(oSent.AxiL) / 6) end
     else self:SetError("ENT.Think: Physics invalid"); end
     if(WireLib and oSent.IsTDB) then
-      self:WriteWire("Rate", self:GetRateMap()) end
+      self:SetWire("Rate", self:GetRateMap()) end
     nPw, nLe = (wPw and wPw or oSent.Power), (wLe and wLe or oSent.Lever)
     self:BroadCast(nPw, nLe):Toc(); return true
   end
 
-  local function spinStart(oPly, oEnt, nDir)
+  local function spinApply(oPly, oEnt, nDir)
     if(not (oEnt and oEnt:IsValid())) then return end
     if(not (oEnt:GetClass() == gsSentHash)) then return end
     local oSent = oEnt[gsSentHash]
     if(oEnt:IsToggled()) then
-      if(oSent.Dir ~= 0) then
-           oSent.On, oSent.Dir = false, 0
-      else oSent.On, oSent.Dir = true , nDir end
+      if(nDir ~= 0) then
+        if(oSent.Dir ~= 0) then
+             oSent.On, oSent.Dir = false, 0
+        else oSent.On, oSent.Dir = true , nDir end
+      end
     else
-      oSent.On, oSent.Dir = true, nDir
+      if(nDir ~= 0) then
+        oSent.On, oSent.Dir = true, nDir
+      else oSent.On, oSent.Dir = false, 0 end
     end
   end
-  
+ 
   local function spinForward(oPly, oEnt)
-    spinStart(oPly, oEnt,  1)
+    spinApply(oPly, oEnt,  1)
   end
 
   local function spinReverse(oPly, oEnt)
-    spinStart(oPly, oEnt, -1)   
+    spinApply(oPly, oEnt, -1)   
   end
-
+  
   local function spinStop(oPly, oEnt)
-    if(not (oEnt and oEnt:IsValid())) then return end
-    if(not (oEnt:GetClass() == gsSentHash)) then return end
-    local oSent = oEnt[gsSentHash]
-    if(not oEnt:IsToggled()) then
-      oSent.On, oSent.Dir = false, 0
-    end
+    spinApply(oPly, oEnt, 0)   
   end
 
   numpad.Register(gsSentHash.."_spinForward_On" , spinForward)
