@@ -57,7 +57,7 @@ local function getTranslate(sT)
   local bS, tS = pcall(fF, gsToolName, gsEntLimit)
   if(not bF) then return nil end; return tS
 end
-      
+
 local function setTranslate(sT)
   table.Empty(gtLang) -- Override translations file
   local tB = getTranslate("en"); if(not tB) then
@@ -138,7 +138,7 @@ if(CLIENT) then
     oPly:ConCommand(gsToolNameU.."angy 0\n")
     oPly:ConCommand(gsToolNameU.."angr 0\n")
   end)
-  
+
   -- listen for changes to the localify language and reload the tool's menu to update the localizations
   cvars.RemoveChangeCallback(varLng:GetName(), gsToolNameU.."lang")
   cvars.AddChangeCallback(varLng:GetName(), function(sNam, vO, vN) setTranslate(vN)
@@ -309,11 +309,11 @@ end
 
 -- Updates direction of the spin axis and lever
 function TOOL:UpdateVectors(stSpinner)
+  local daxs, dlev = self:GetDirectionID()
   local vF, vL, vA = self:RecalculateUCS(self:GetVectors())
-  if(daxs ~= 0 and dlev ~= 0 and -- Do not spawn with invalid user axises
-    math.abs(vA:Dot(vL)) > 0.01) then
+  if(daxs ~= 0 and dlev ~= 0 and math.abs(vA:Dot(vL)) > 0.01) then
     ErrorNoHalt("TOOL:UpdateVectors: Spinner axis not orthogonal to lever\n"); return false end
-  if(not (type(vA) == "Vector")) then
+  if(not (type(vA) == "Vector")) then -- Do not spawn with invalid user axises
     ErrorNoHalt("TOOL:UpdateVectors: Spinner axis missing <"..tostring(vA)..">\n"); return false end
   if(not (type(vL) == "Vector")) then
     ErrorNoHalt("TOOL:UpdateVectors: Spinner lever missing <"..tostring(vL)..">\n"); return false end
@@ -582,7 +582,7 @@ end
 
 local conVarList = TOOL:BuildConVarList()
 function TOOL.BuildCPanel(CPanel)
-  CPanel:ClearControls()  
+  CPanel:ClearControls()
   local nMaxLine  = varMaxLine:GetFloat()
   local nMaxScale = varMaxScale:GetFloat()
   local CurY, pItem, sTr = 0 -- pItem is the current panel created
