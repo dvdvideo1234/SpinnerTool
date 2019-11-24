@@ -311,8 +311,14 @@ end
 function TOOL:UpdateVectors(stSpinner)
   local daxs, dlev = self:GetDirectionID()
   local vF, vL, vA = self:RecalculateUCS(self:GetVectors())
-  if(daxs ~= 0 and dlev ~= 0 and math.abs(vA:Dot(vL)) > 0.01) then
-    ErrorNoHalt("TOOL:UpdateVectors: Spinner axis not orthogonal to lever\n"); return false end
+  if(daxs ~= 0 and dlev ~= 0) then
+    if(math.abs(vA:Dot(vL)) > 0.01) then 
+      ErrorNoHalt("TOOL:UpdateVectors: Spinner axis not orthogonal to lever\n"); return false end
+    if(math.abs(vA:Dot(vF)) > 0.01) then 
+      ErrorNoHalt("TOOL:UpdateVectors: Spinner axis not orthogonal to force\n"); return false end
+    if(math.abs(vF:Dot(vL)) > 0.01) then 
+      ErrorNoHalt("TOOL:UpdateVectors: Spinner force not orthogonal to lever\n"); return false end
+  end
   if(not (type(vA) == "Vector")) then -- Do not spawn with invalid user axises
     ErrorNoHalt("TOOL:UpdateVectors: Spinner axis missing <"..tostring(vA)..">\n"); return false end
   if(not (type(vL) == "Vector")) then
