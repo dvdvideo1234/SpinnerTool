@@ -312,11 +312,11 @@ function TOOL:UpdateVectors(stSpinner)
   local daxs, dlev = self:GetDirectionID()
   local vF, vL, vA = self:RecalculateUCS(self:GetVectors())
   if(daxs ~= 0 and dlev ~= 0) then
-    if(math.abs(vA:Dot(vL)) > 0.01) then 
+    if(math.abs(vA:Dot(vL)) > 0.01) then
       ErrorNoHalt("TOOL:UpdateVectors: Spinner axis not orthogonal to lever\n"); return false end
-    if(math.abs(vA:Dot(vF)) > 0.01) then 
+    if(math.abs(vA:Dot(vF)) > 0.01) then
       ErrorNoHalt("TOOL:UpdateVectors: Spinner axis not orthogonal to force\n"); return false end
-    if(math.abs(vF:Dot(vL)) > 0.01) then 
+    if(math.abs(vF:Dot(vL)) > 0.01) then
       ErrorNoHalt("TOOL:UpdateVectors: Spinner force not orthogonal to lever\n"); return false end
   end
   if(not (type(vA) == "Vector")) then -- Do not spawn with invalid user axises
@@ -484,6 +484,13 @@ end
 
 function TOOL:UpdateGhost(oEnt, oPly)
   if(not (oEnt and oEnt:IsValid())) then return end
+  if(not (oPly and oPly:IsValid() and oPly:IsPlayer())) then return end
+  local stTrace = oPly:GetEyeTrace(); local trEnt = stTrace.Entity
+  if(trEnt and -- Make sure we don't draw the ghost when a valid spinner is traced
+     trEnt:IsValid() and -- Valid entity class of the existing trace entity
+     trEnt:GetClass() == gsSentHash) then -- The trace is actual spinner SENT 
+    oEnt:SetNoDraw(true); return
+  end
   oEnt:SetNoDraw(false); oEnt:DrawShadow(false)
   oEnt:SetColor(gtPalette["gh"])
   local stTrace = util.TraceLine(util.GetPlayerTrace(oPly))
