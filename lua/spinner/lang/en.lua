@@ -1,5 +1,5 @@
 ﻿return function(sTool, sLimit) local tSet = {} -- English
-  tSet["tool."..sTool..".name"       ] = "Spinner tool"
+  tSet["tool."..sTool..".name"       ] = "Spinner Tool"
   tSet["tool."..sTool..".desc"       ] = "Creates/Updates a spinner entity"
   tSet["tool."..sTool..".left"       ] = "Create/Update spinner"
   tSet["tool."..sTool..".left_use"   ] = "Create/Update spinner"
