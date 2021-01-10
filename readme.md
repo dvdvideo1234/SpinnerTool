@@ -1,6 +1,6 @@
 # Spinner tool entity ( Copyright 2016 ME )
 
-![SpinnerTool](https://raw.githubusercontent.com/dvdvideo1234/SpinnerTool/master/data/pictures/screenshot.jpg)
+![SpinnerTool][ref-screenshot]
 
 #### What does this thing do ?
 This entity defines a fidget spinner inside the game Garry's mod.
@@ -114,6 +114,7 @@ By doing this, you are forcing people to use an older copy of this script !
 
 ### Have a nice time spinning this up !
 
+[ref-screenshot]: https://github.com/dvdvideo1234/SpinnerTool/blob/master/data/spinner/tools/pictures/screenshot.jpg
 [spinner_ref]: https://en.wikipedia.org/wiki/Fidget_spinner
 [wire_ref]: https://github.com/wiremod/wire/blob/master/lua/wire/server/wirelib.lua#L106
 [force_ref]: https://en.wikipedia.org/wiki/Force
