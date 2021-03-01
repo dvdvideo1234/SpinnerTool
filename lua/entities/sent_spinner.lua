@@ -62,18 +62,27 @@ function ENT:GetLever()
 end
 
 function ENT:GetTorqueAxis()
-  if(SERVER)     then local oSent = self[gsSentHash]; return oSent.AxiL
-  elseif(CLIENT) then return self:GetNWVector(gsSentHash.."_adir") end
+  local vAxi = Vector(); if(SERVER) then
+    vAxi:Set(self[gsSentHash].AxiL)
+  elseif(CLIENT) then
+    vAxi:Set(self:GetNWVector(gsSentHash.."_adir"))
+  end; vAxi:Normalize(); return vAxi
 end
 
 function ENT:GetTorqueLever()
-  if(SERVER)     then local oSent = self[gsSentHash]; return oSent.LevL
-  elseif(CLIENT) then return self:GetNWVector(gsSentHash.."_ldir") end
+  local vLev = Vector(); if(SERVER) then
+    vLev:Set(self[gsSentHash].LevL)
+  elseif(CLIENT) then
+    vLev:Set(self:GetNWVector(gsSentHash.."_ldir"))
+  end; vLev:Normalize(); return vLev
 end
 
 function ENT:GetTorqueForce()
-  if(SERVER)     then local oSent = self[gsSentHash]; return oSent.ForL
-  elseif(CLIENT) then return self:GetNWVector(gsSentHash.."_fdir") end
+  local vFor = Vector(); if(SERVER) then
+    vFor:Set(self[gsSentHash].ForL)
+  elseif(CLIENT) then
+    vFor:Set(self:GetNWVector(gsSentHash.."_fdir"))
+  end; vFor:Normalize(); return vFor
 end
 
 function ENT:GetSpinCenter()
@@ -247,6 +256,7 @@ if(SERVER) then
 
   function ENT:Setup(stSpinner)
     self:SetPhysRadius(stSpinner.Radi)         -- Set the radius if given
+    local oSent = self[gsSentHash]
     local oPhys = self:GetPhysicsObject()
     if(oPhys and oPhys:IsValid()) then
       self:SetToggled(stSpinner.Togg)          -- Is it going to be toggled
@@ -255,7 +265,6 @@ if(SERVER) then
       self:SetTorqueLever(stSpinner.LevL, stSpinner.CLev) -- Lever direction and count
       self:SetLever(stSpinner.Lever)           -- Leverage length
       self:SetNWVector(gsSentHash.."_cen", oPhys:GetMassCenter())
-      local oSent = self[gsSentHash]
       local nMass = math.Clamp(tonumber(stSpinner.Mass) or 1, 1, varMaxMass:GetFloat())
       oPhys:SetMass(nMass); oSent.Mass = nMass -- Mass
       oSent.Prop = stSpinner.Prop              -- Model
@@ -368,17 +377,17 @@ if(SERVER) then
       else oSent.On, oSent.Dir = false, 0 end
     end
   end
- 
+
   local function spinForward(oPly, oEnt)
     spinApply(oPly, oEnt,  1)
   end
 
   local function spinReverse(oPly, oEnt)
-    spinApply(oPly, oEnt, -1)   
+    spinApply(oPly, oEnt, -1)
   end
-  
+
   local function spinStop(oPly, oEnt)
-    spinApply(oPly, oEnt, 0)   
+    spinApply(oPly, oEnt, 0)
   end
 
   numpad.Register(gsSentHash.."_spinForward_On" , spinForward)

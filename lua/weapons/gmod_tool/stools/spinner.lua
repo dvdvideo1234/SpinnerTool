@@ -52,7 +52,7 @@ local gtDirectionID = {}
 local function getTranslate(sT)
   local sN = gsLangForm:format("", sT..".lua")
   if(not file.Exists("lua/"..sN, "GAME")) then return nil end
-  local fT = CompileFile(sN); if(not fT) then return print("1") end
+  local fT = CompileFile(sN); if(not fT) then return nil end
   local bF, fF = pcall(fT); if(not bF) then return nil end
   local bS, tS = pcall(fF, gsToolName, gsEntLimit)
   if(not bF) then return nil end; return tS
@@ -488,7 +488,7 @@ function TOOL:UpdateGhost(oEnt, oPly)
   local stTrace = oPly:GetEyeTrace(); local trEnt = stTrace.Entity
   if(trEnt and -- Make sure we don't draw the ghost when a valid spinner is traced
      trEnt:IsValid() and -- Valid entity class of the existing trace entity
-     trEnt:GetClass() == gsSentHash) then -- The trace is actual spinner SENT 
+     trEnt:GetClass() == gsSentHash) then -- The trace is actual spinner SENT
     oEnt:SetNoDraw(true); return
   end
   oEnt:SetNoDraw(false); oEnt:DrawShadow(false)
@@ -560,21 +560,22 @@ function TOOL:DrawHUD()
         local spCnt = trEnt:GetLeverCount()
         local spAxs = trEnt:GetTorqueAxis()
         local spLev = trEnt:GetTorqueLever()
+        local spAng = spLev:AngleEx(spAxs)
+        local wpAng, dA = Angle(), (360 / spCnt)
         local wvAxs = Vector(); wvAxs:Set(spAxs); wvAxs:Rotate(trAng)
-        local wvLev = Vector(); wvLev:Set(spLev); wvLev:Rotate(trAng)
-        local dAng, dA = wvLev:AngleEx(wvAxs), (360 / spCnt)
         local xyOO, xyOA = trCen:ToScreen(), (axis * wvAxs + trCen):ToScreen()
         drawLineSpinner(xyOO, xyOA, "b")
         drawCircleSpinner(xyOO, radc, "y")
         for ID = 1, spCnt do
-          local vlAn, vfAn = dAng:Forward(), dAng:Right(); vfAn:Mul(-1)
-          local vLev = (nL * vlAn); vLev:Add(trCen)
+          wpAng:Set(trEnt:LocalToWorldAngles(spAng))
+          local vLev = wpAng:Forward(); vLev:Mul(nL); vLev:Add(trCen)
+          local vFrc = wpAng:Right(); vFrc:Mul(-1)
           local xyLE = vLev:ToScreen(); drawLineSpinner(xyOO, xyLE, "g")
           if(nP ~= 0) then
-            local vF, vE = (nF * vfAn), (nE * vfAn); vF:Add(vLev); vE:Add(vLev)
+            local vF, vE = (nF * vFrc), (nE * vFrc); vF:Add(vLev); vE:Add(vLev)
             local xyFF = vF:ToScreen(); drawLineSpinner(xyLE, xyFF, "y")
             local xyFE = vE:ToScreen(); drawLineSpinner(xyFF, xyFE, "r")
-          end; dAng:RotateAroundAxis(wvAxs, dA)
+          end; spAng:RotateAroundAxis(spAxs, dA)
         end
       elseif(cls == "prop_physics") then
         local trAng, vF, vL, vA = trEnt:GetAngles()
@@ -642,7 +643,7 @@ function TOOL.BuildCPanel(CPanel)
   CPanel:NumSlider(getPhrase("tool."..gsToolName..".forcelim" ), gsToolNameU.."forcelim" , 0, nMaxScale, 3)
   CPanel:NumSlider(getPhrase("tool."..gsToolName..".torqulim" ), gsToolNameU.."torqulim" , 0, nMaxScale, 3)
   CPanel:NumSlider(getPhrase("tool."..gsToolName..".lever"    ), gsToolNameU.."lever"    , 0, nMaxScale, 3)
-  CPanel:NumSlider(getPhrase("tool."..gsToolName..".levercnt" ), gsToolNameU.."levercnt" , 1, gnMaxAng , 3)
+  CPanel:NumSlider(getPhrase("tool."..gsToolName..".levercnt" ), gsToolNameU.."levercnt" , 1, gnMaxAng , 0)
   CPanel:NumSlider(getPhrase("tool."..gsToolName..".radius"   ), gsToolNameU.."radius"   , 0, varMaxRadius:GetFloat(), 3)
   CPanel:Button   (getPhrase("tool."..gsToolName..".resetoffs"), gsToolNameU.."resetoffs")
   CPanel:NumSlider(getPhrase("tool."..gsToolName..".linx"     ), gsToolNameU.."linx"     , -nMaxLine, nMaxLine, 3)
