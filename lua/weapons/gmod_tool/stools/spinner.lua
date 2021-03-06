@@ -242,11 +242,12 @@ local function setComboBoxPanel(CPanel, sConv, nCnt)
   local sBase = "tool."..gsToolName.."."..sConv
   local sMenu, sTtip = getPhrase(sBase.."_con"), getPhrase(sBase)
   local pCombo, pLabel = CPanel:ComboBox(sMenu, gsToolNameU..sConv)
-  pCombo:SetSortItems(false); pLabel:SetTall(35); pCombo:SetTall(35)
+  pCombo:SetSortItems(false); pCombo:Dock(TOP); pCombo:SetTall(25)
+  pCombo:UpdateColours(CPanel:GetSkin())
+  pLabel:SetTooltip(sTtip); pCombo:SetTooltip(sTtip)
   for iD = 0, nCnt do local sI = getIconID(sConv, iD)
     pCombo:AddChoice(getPhrase(sBase..iD), iD, false, sI)
-  end; pLabel:SetTooltip(sTtip); pCombo:SetTooltip(sTtip)
-  return pCombo, pLabel
+  end; return pCombo, pLabel
 end
 
 local function setNumSliderPanel(CPanel, sConv, nMin, nMax, nDig)
@@ -563,24 +564,26 @@ end
 function TOOL:UpdateGhost(oEnt, oPly)
   if(not (oEnt and oEnt:IsValid())) then return end
   if(not (oPly and oPly:IsValid() and oPly:IsPlayer())) then return end
-  local stTrace = oPly:GetEyeTrace(); local trEnt = stTrace.Entity
-  if(trEnt and -- Make sure we don't draw the ghost when a valid spinner is traced
-     trEnt:IsValid() and -- Valid entity class of the existing trace entity
-     trEnt:GetClass() == gsSentHash) then -- The trace is actual spinner SENT
-    oEnt:SetNoDraw(true); return
-  end
-  oEnt:SetNoDraw(false); oEnt:DrawShadow(false)
-  oEnt:SetColor(gtPalette["gh"])
-  local stTrace = util.TraceLine(util.GetPlayerTrace(oPly))
-  if(not stTrace.Hit) then return end
-  self:ApplySpawn(oEnt, stTrace)
+  local stTrace = oPly:GetEyeTrace()
+  local trEnt   = stTrace.Entity
+  if(stTrace.Hit) then
+    if(trEnt and -- Make sure we don't draw the ghost when a valid spinner is traced
+       trEnt:IsValid() and -- Valid entity class of the existing trace entity
+       trEnt:GetClass() == gsSentHash) then -- The trace is actual spinner SENT
+      oEnt:SetNoDraw(true)
+    else
+      oEnt:SetNoDraw(false); oEnt:DrawShadow(false)
+      oEnt:SetColor(gtPalette["gh"])
+      self:ApplySpawn(oEnt, stTrace)
+    end
+  else oEnt:SetNoDraw(true) end
 end
 
 function TOOL:Think()
   local model = self:GetModel() -- Ghost irrelevant
   local ply   = self:GetOwner() -- Player doing the thing
   if(util.IsValidModel(model)) then
-    if(self:GetGhosting() and self:GetConstraint() ~= 0) then
+    if(self:GetGhosting()) then
       local ghEnt = self.GhostEntity -- Store a local reference to the ghost
       if(not (ghEnt and ghEnt:IsValid() and ghEnt:GetModel() == model)) then
         self:MakeGhostEntity(model,VEC_ZERO,ANG_ZERO) end;
