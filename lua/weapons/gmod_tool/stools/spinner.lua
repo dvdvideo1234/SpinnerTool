@@ -44,7 +44,7 @@ gtPalette["k"]  = Color( 0 , 0 , 0 ,255)
 gtPalette["m"]  = Color(255, 0 ,255,255)
 gtPalette["y"]  = Color(255,255, 0 ,255)
 gtPalette["c"]  = Color( 0 ,255,255,255)
-gtPalette["gh"] = Color(255,255,255,200)
+gtPalette["gh"] = Color(255,255,255,150)
 
 -- Initialize directions. Zero is custom
 gtDirectID[1] = Vector( 1, 0, 0)
@@ -572,8 +572,8 @@ function TOOL:UpdateGhost(oEnt, oPly)
        trEnt:GetClass() == gsSentHash) then -- The trace is actual spinner SENT
       oEnt:SetNoDraw(true)
     else
-      oEnt:SetNoDraw(false); oEnt:DrawShadow(false)
       oEnt:SetColor(gtPalette["gh"])
+      oEnt:SetNoDraw(false); oEnt:DrawShadow(false)
       self:ApplySpawn(oEnt, stTrace)
     end
   else oEnt:SetNoDraw(true) end
@@ -586,7 +586,7 @@ function TOOL:Think()
     if(self:GetGhosting()) then
       local ghEnt = self.GhostEntity -- Store a local reference to the ghost
       if(not (ghEnt and ghEnt:IsValid() and ghEnt:GetModel() == model)) then
-        self:MakeGhostEntity(model,VEC_ZERO,ANG_ZERO) end;
+        self:MakeGhostEntity(model,VEC_ZERO,ANG_ZERO) end
       self:UpdateGhost(ghEnt, ply) -- In client single player the ghost is skipped
     else self:ReleaseGhostEntity() end -- Delete the ghost entity when ghosting is disabled
   end
