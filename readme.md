@@ -54,12 +54,12 @@ If you do not want to define your own vectors,
 you can use the already default pre-defined values by
 selecting a [direction][direction_ref] with a sign attached:
 
-![#R][ref_cl_red]   `+X --> Forward local vector`  
-![#G][ref_cl_green] `+Y --> Left local vector`  
-![#B][ref_cl_blue]  `+Z --> Up local vector`  
-![#R][ref_cl_red]   `-X --> Back local vector`  
-![#G][ref_cl_green] `-Y --> Right local vector`  
-![#B][ref_cl_blue]  `-Z --> Down local vector`  
+![#R][ref_cl_rp] `+X --> Forward local vector`  
+![#G][ref_cl_gp] `+Y --> Left local vector`  
+![#B][ref_cl_bp] `+Z --> Up local vector`  
+![#R][ref_cl_rm] `-X --> Back local vector`  
+![#G][ref_cl_gm] `-Y --> Right local vector`  
+![#B][ref_cl_bm] `-Z --> Down local vector`  
 
 These colors are representing all axes default chosen ones.
 If you want to use your custom lever or axis u can select the `<Custom>`
@@ -128,9 +128,12 @@ By doing this, you are forcing people to use an older copy of this script !
 [ref_cl_l]: https://via.placeholder.com/15x15.png/00ff00/000000?text=L
 [ref_cl_f]: https://via.placeholder.com/15x15.png/ff0000/000000?text=F
 [ref_cl_c]: https://via.placeholder.com/15x15.png/ffff00/000000?text=C
-[ref_cl_red]: https://placehold.it/15/ff0000/000000?text=+
-[ref_cl_green]: https://placehold.it/15/00ff00/000000?text=+
-[ref_cl_blue]: https://placehold.it/15/0000ff/000000?text=+
+[ref_cl_rp]: https://via.placeholder.com/15/ff0000/000000?text=%2B
+[ref_cl_gp]: https://via.placeholder.com/15/00ff00/000000?text=%2B
+[ref_cl_bp]: https://via.placeholder.com/15/0000ff/000000?text=%2B
+[ref_cl_rm]: https://via.placeholder.com/15/ff0000/000000?text=%2D
+[ref_cl_gm]: https://via.placeholder.com/15/00ff00/000000?text=%2D
+[ref_cl_bm]: https://via.placeholder.com/15/0000ff/000000?text=%2D
 [enum_ref]: https://wiki.garrysmod.com/page/Enums/IN
 [constraint_ref]: https://wiki.garrysmod.com/page/constraint
 [think_ref]: https://wiki.garrysmod.com/page/GM/Think
