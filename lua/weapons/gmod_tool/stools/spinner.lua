@@ -6,7 +6,7 @@
  * Requires : /lua/entities/sent_spinner.lua
  * Created  : Using tool requirement
  * Defines  : Spinner manager script
-]]--
+]]
 local gsSentHash   = "sent_spinner"
 local varLng       = GetConVar("gmod_language")
 local gsSentName   = gsSentHash:gsub("sent_","")
@@ -26,11 +26,9 @@ local gsToolName   = gsSentName
 local gsToolNameU  = gsToolName.."_"
 local gsEntLimit   = gsSentName.."s"
 local gnMaxAng     = 360
-local gsLangForm   = ("%s"..gsToolName.."/lang/%s")
 local VEC_ZERO     = Vector()
 local ANG_ZERO     = Angle ()
 local goTool       = TOOL
-local gtLang       = {}
 local gtPalette    = {}
 local gtDirectID   = {}
 local gtComboIcon  = {}
@@ -54,37 +52,7 @@ gtDirectID[4] = Vector(-1, 0, 0)
 gtDirectID[5] = Vector( 0,-1, 0)
 gtDirectID[6] = Vector( 0, 0,-1)
 
-local function getTranslate(sT)
-  local sN = gsLangForm:format("", sT..".lua")
-  if(not file.Exists("lua/"..sN, "GAME")) then return nil end
-  local fT = CompileFile(sN); if(not fT) then return nil end
-  local bF, fF = pcall(fT); if(not bF) then return nil end
-  local bS, tS = pcall(fF, gsToolName, gsEntLimit)
-  if(not bF) then return nil end; return tS
-end
-
-local function setTranslate(sT)
-  table.Empty(gtLang) -- Override translations file
-  local tB = getTranslate("en"); if(not tB) then
-    ErrorNoHalt(gsToolName..": setTranslate: Missing") end
-  if(sT ~= "en") then local tC = getTranslate(sT); if(tC) then
-    for key, val in pairs(tB) do tB[key] = (tC[key] or tB[key]) end end
-  end; for key, val in pairs(tB) do gtLang[key] = tB[key]; language.Add(key, val) end
-end
-
-local function getPhrase(sK)
-  local sK = tostring(sK) if(not gtLang[sK]) then
-    ErrorNoHalt(gsToolName..": getPhrase("..sK.."): Missing")
-    return "Oops, missing ?" -- Return some default translation
-  end; return gtLang[sK]
-end
-
 if(SERVER) then
-
-  -- Send language translations to the client to populate the menu
-  local gtTransFile = file.Find(gsLangForm:format("lua/", "*.lua"), "GAME")
-  for iD = 1, #gtTransFile do AddCSLuaFile(gsLangForm:format("", gtTransFile[iD])) end
-
   CreateConVar("sbox_max"..gsEntLimit, 10, FCVAR_NOTIFY, "Maximum spinners to be spawned")
 
   cleanup.Register(gsEntLimit)
@@ -138,7 +106,6 @@ if(CLIENT) then
   }
 
   -- Translate the meny and attach routine for reset
-  setTranslate(varLng:GetString())
   concommand.Add(gsToolNameU.."resetoffs", function(oPly,oCom,oArgs)
     oPly:ConCommand(gsToolNameU.."linx 0\n")
     oPly:ConCommand(gsToolNameU.."liny 0\n")
@@ -167,7 +134,7 @@ if(CLIENT) then
 
   -- listen for changes to the localify language and reload the tool's menu to update the localizations
   cvars.RemoveChangeCallback(varLng:GetName(), gsToolNameU.."lang")
-  cvars.AddChangeCallback(varLng:GetName(), function(sNam, vO, vN) setTranslate(vN)
+  cvars.AddChangeCallback(varLng:GetName(), function(sNam, vO, vN)
     local cPanel = controlpanel.Get(goTool.Mode); if(not IsValid(cPanel)) then return end
     cPanel:ClearControls(); goTool.BuildCPanel(cPanel)
   end, gsToolNameU.."lang")
@@ -240,19 +207,19 @@ end
 
 local function setComboBoxPanel(CPanel, sConv, nCnt)
   local sBase = "tool."..gsToolName.."."..sConv
-  local sMenu, sTtip = getPhrase(sBase.."_con"), getPhrase(sBase)
+  local sMenu, sTtip = language.GetPhrase(sBase.."_con"), language.GetPhrase(sBase)
   local pCombo, pLabel = CPanel:ComboBox(sMenu, gsToolNameU..sConv)
   pCombo:SetSortItems(false); pCombo:Dock(TOP); pCombo:SetTall(25)
   pCombo:UpdateColours(CPanel:GetSkin())
   pLabel:SetTooltip(sTtip); pCombo:SetTooltip(sTtip)
   for iD = 0, nCnt do local sI = getIconID(sConv, iD)
-    pCombo:AddChoice(getPhrase(sBase..iD), iD, false, sI)
+    pCombo:AddChoice(language.GetPhrase(sBase..iD), iD, false, sI)
   end; return pCombo, pLabel
 end
 
 local function setNumSliderPanel(CPanel, sConv, nMin, nMax, nDig)
   local sBase = "tool."..gsToolName.."."..sConv
-  local sMenu, sTtip = getPhrase(sBase.."_con"), getPhrase(sBase)
+  local sMenu, sTtip = language.GetPhrase(sBase.."_con"), language.GetPhrase(sBase)
   local vDefv = gtConvar[gsToolNameU..sConv]
   local pItem = CPanel:NumSlider(sMenu, gsToolNameU..sConv, nMin, nMax, nDig)
   pItem:SetTooltip(sTtip); pItem:SetDefaultValue(vDefv); return pItem
@@ -260,7 +227,7 @@ end
 
 local function setCheckBoxPanel(CPanel, sConv)
   local sBase = "tool."..gsToolName.."."..sConv
-  local sMenu, sTtip = getPhrase(sBase.."_con"), getPhrase(sBase)
+  local sMenu, sTtip = language.GetPhrase(sBase.."_con"), language.GetPhrase(sBase)
   local pItem = CPanel:CheckBox(sMenu, gsToolNameU..sConv)
   pItem:SetTooltip(sTtip); return pItem
 end
@@ -680,8 +647,8 @@ function TOOL.BuildCPanel(CPanel) local pItem
   local nMaxLine  = varMaxLine:GetFloat()
   local nMaxScale = varMaxScale:GetFloat()
   CPanel:ClearControls(); CPanel:DockPadding(5, 0, 5, 10)
-  pItem = CPanel:SetName(getPhrase("tool."..gsToolName..".name"))
-  pItem = CPanel:Help   (getPhrase("tool."..gsToolName..".desc"))
+  pItem = CPanel:SetName(language.GetPhrase("tool."..gsToolName..".name"))
+  pItem = CPanel:Help   (language.GetPhrase("tool."..gsToolName..".desc"))
 
   pItem = vgui.Create("ControlPresets", CPanel)
   pItem:SetPreset(gsToolName)
@@ -695,12 +662,12 @@ function TOOL.BuildCPanel(CPanel) local pItem
   setComboBoxPanel(CPanel, "dirlever"  , 6)
 
   pItem = vgui.Create("CtrlNumPad", CPanel)
-  pItem:SetLabel1(getPhrase("tool."..gsToolName..".keyfwd_con"))
-  pItem:SetLabel2(getPhrase("tool."..gsToolName..".keyrev_con"))
+  pItem:SetLabel1(language.GetPhrase("tool."..gsToolName..".keyfwd_con"))
+  pItem:SetLabel2(language.GetPhrase("tool."..gsToolName..".keyrev_con"))
   pItem:SetConVar1(gsToolNameU.."keyfwd")
   pItem:SetConVar2(gsToolNameU.."keyrev")
-  pItem.NumPad1:SetTooltip(getPhrase("tool."..gsToolName..".keyfwd"))
-  pItem.NumPad2:SetTooltip(getPhrase("tool."..gsToolName..".keyrev"))
+  pItem.NumPad1:SetTooltip(language.GetPhrase("tool."..gsToolName..".keyfwd"))
+  pItem.NumPad2:SetTooltip(language.GetPhrase("tool."..gsToolName..".keyrev"))
   CPanel:AddPanel(pItem)
 
   setNumSliderPanel(CPanel, "mass"     , 1, varMaxMass:GetFloat(), 3)
@@ -712,8 +679,8 @@ function TOOL.BuildCPanel(CPanel) local pItem
   setNumSliderPanel(CPanel, "levercnt" , 1, gnMaxAng , 0)
   setNumSliderPanel(CPanel, "radius"   , 0, varMaxRadius:GetFloat(), 3)
 
-  pItem = CPanel:Button(getPhrase("tool."..gsToolName..".resetoffs_con"), gsToolNameU.."resetoffs")
-       pItem:SetTooltip(getPhrase("tool."..gsToolName..".resetoffs"))
+  pItem = CPanel:Button(language.GetPhrase("tool."..gsToolName..".resetoffs_con"), gsToolNameU.."resetoffs")
+       pItem:SetTooltip(language.GetPhrase("tool."..gsToolName..".resetoffs"))
 
   setNumSliderPanel(CPanel, "linx"    , -nMaxLine, nMaxLine, 3)
   setNumSliderPanel(CPanel, "liny"    , -nMaxLine, nMaxLine, 3)

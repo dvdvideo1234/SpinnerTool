@@ -18,7 +18,7 @@ set gmadBinPath=F:\Games\Steam\steamapps\common\GarrysMod\bin
 set gmadADTools=%gmadRevPath%data\spinner\tools
 set "gmadTime=%date% %time%"
 set gmadID=899064029
-set gmadDirs=(lua)
+set gmadDirs=(lua resource)
 set gmadLogs=
 set gmadCRLF=^
 
