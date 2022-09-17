@@ -96,7 +96,7 @@ if(SERVER) then
 end
 
 if(CLIENT) then
-  language.Add("tool."..gsToolName..".category" , "Construction")
+  language.Add("tool."..gsToolName..".category", "Construction")
 
   TOOL.Information = {
     { name = "info",  stage = 1   },
