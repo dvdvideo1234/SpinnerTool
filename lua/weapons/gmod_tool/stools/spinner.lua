@@ -25,6 +25,7 @@ local varEnableDT  = CreateConVar("sbox_en" ..gsSentName.."_timdbg", 0, gnVarFla
 local gsToolName   = gsSentName
 local gsToolNameU  = gsToolName.."_"
 local gsEntLimit   = gsSentName.."s"
+local gtNotifUser  = {"notification.AddLegacy('%s', NOTIFY_%s, %d)", "surface.PlaySound('ambient/water/drip%d.wav')"}
 local gnMaxAng     = 360
 local VEC_ZERO     = Vector()
 local ANG_ZERO     = Angle ()
@@ -234,10 +235,8 @@ end
 
 function TOOL:NotifyUser(sMsg, sNot, iSiz)
   local user, isnd = self:GetOwner(), math.random(1, 4)
-  local fmsg = "GAMEMODE:AddNotify('%s', NOTIFY_%s, %d)"
-  local fsnd = "surface.PlaySound('ambient/water/drip%d.wav')"
-  user:SendLua(fmsg:format(sMsg, sNot, iSiz))
-  user:SendLua(fsnd:format(isnd))
+  user:SendLua(gtNotifUser[1]:format(sMsg, sNot, iSiz))
+  user:SendLua(gtNotifUser[2]:format(isnd))
 end
 
 function TOOL:GetDeviationPos()
